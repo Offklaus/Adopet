@@ -1,0 +1,225 @@
+import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { after, before, beforeEach, describe, test } from 'node:test'
+import { createApp } from '../src/app.js'
+import { openDatabase } from '../src/db/database.js'
+import { seed } from '../src/db/seed.js'
+
+const ORIGIN = 'http://localhost:5173'
+let db
+let server
+let baseUrl
+
+before(async () => {
+  db = openDatabase(':memory:')
+  server = createServer(createApp({ db, corsOrigins: [ORIGIN], log: () => {} }))
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  baseUrl = `http://127.0.0.1:${server.address().port}`
+})
+
+after(() => {
+  server.close()
+  db.close()
+})
+
+// Cada teste começa com os dados iniciais.
+beforeEach(() => seed(db))
+
+async function api(path, { method = 'GET', body, headers } = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: { ...(body !== undefined && { 'Content-Type': 'application/json' }), ...headers },
+    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body)
+  })
+  const text = await response.text()
+  return { status: response.status, headers: response.headers, data: text ? JSON.parse(text) : null }
+}
+
+const validAdoption = {
+  petId: 'thor',
+  name: 'Ana Souza',
+  email: 'Ana@Exemplo.com',
+  phone: '(11) 91234-5678',
+  city: 'São Paulo',
+  housing: 'apartamento',
+  hasOtherPets: false,
+  message: 'Tenho tempo para passeios.',
+  agreeVisit: true
+}
+
+describe('geral', () => {
+  test('GET /api/health responde ok', async () => {
+    const { status, data } = await api('/api/health')
+    assert.equal(status, 200)
+    assert.deepEqual(data, { status: 'ok' })
+  })
+
+  test('rota inexistente devolve 404 em JSON', async () => {
+    const { status, data } = await api('/api/nada')
+    assert.equal(status, 404)
+    assert.equal(data.message, 'Rota não encontrada.')
+  })
+
+  test('método errado devolve 405', async () => {
+    const { status } = await api('/api/pets', { method: 'DELETE' })
+    assert.equal(status, 405)
+  })
+
+  test('CORS libera só a origem configurada', async () => {
+    const allowed = await api('/api/health', { headers: { Origin: ORIGIN } })
+    assert.equal(allowed.headers.get('access-control-allow-origin'), ORIGIN)
+
+    const blocked = await api('/api/health', { headers: { Origin: 'https://outro-site.com' } })
+    assert.equal(blocked.headers.get('access-control-allow-origin'), null)
+  })
+
+  test('preflight OPTIONS devolve 204', async () => {
+    const { status } = await api('/api/adoptions', { method: 'OPTIONS', headers: { Origin: ORIGIN } })
+    assert.equal(status, 204)
+  })
+})
+
+describe('pets', () => {
+  test('lista todos, mais recentes primeiro, com tags como array', async () => {
+    const { status, data } = await api('/api/pets')
+    assert.equal(status, 200)
+    assert.equal(data.length, 6)
+    assert.equal(data[0].id, 'pipoca')
+    assert.ok(Array.isArray(data[0].tags))
+  })
+
+  test('filtra por espécie', async () => {
+    const { data } = await api('/api/pets?species=gato')
+    assert.deepEqual(data.map((pet) => pet.id).sort(), ['luna', 'mel', 'nino'])
+  })
+
+  test('busca por cidade sem diferenciar maiúsculas', async () => {
+    const { data } = await api('/api/pets?q=campinas')
+    assert.deepEqual(data.map((pet) => pet.id), ['mel'])
+  })
+
+  test('curingas do LIKE na busca são tratados como texto', async () => {
+    const { data } = await api('/api/pets?q=%25')
+    assert.equal(data.length, 0)
+  })
+
+  test('espécie inválida devolve 400', async () => {
+    const { status } = await api('/api/pets?species=peixe')
+    assert.equal(status, 400)
+  })
+
+  test('busca um pet pelo id', async () => {
+    const { status, data } = await api('/api/pets/thor')
+    assert.equal(status, 200)
+    assert.equal(data.name, 'Thor')
+  })
+
+  test('pet inexistente devolve 404', async () => {
+    const { status, data } = await api('/api/pets/nao-existe')
+    assert.equal(status, 404)
+    assert.equal(data.message, 'Pet não encontrado.')
+  })
+})
+
+describe('campanhas e doações', () => {
+  test('lista campanhas ativas, a mais recente primeiro', async () => {
+    const { data } = await api('/api/campaigns')
+    assert.deepEqual(data.map((campaign) => campaign.id), ['inverno-2026', 'castracao', 'reforma-canil'])
+  })
+
+  test('registra doação para uma campanha como pendente', async () => {
+    const { status, data } = await api('/api/donations', {
+      method: 'POST',
+      body: { campaignId: 'castracao', amount: 100 }
+    })
+    assert.equal(status, 201)
+    assert.equal(data.status, 'pending')
+    assert.equal(data.amount, 100)
+
+    // Doação pendente não entra na meta.
+    const { data: campaigns } = await api('/api/campaigns')
+    assert.equal(campaigns.find((campaign) => campaign.id === 'castracao').raised, 3150)
+  })
+
+  test('aceita doação livre (sem campanha)', async () => {
+    const { status, data } = await api('/api/donations', { method: 'POST', body: { campaignId: null, amount: 30 } })
+    assert.equal(status, 201)
+    assert.equal(data.campaignId, null)
+  })
+
+  test('rejeita valor inválido com erro no campo', async () => {
+    for (const amount of [0, -5, 10.5, '50', 100_001]) {
+      const { status, data } = await api('/api/donations', { method: 'POST', body: { amount } })
+      assert.equal(status, 422, `valor ${amount}`)
+      assert.ok(data.errors.amount)
+    }
+  })
+
+  test('campanha inexistente devolve 404', async () => {
+    const { status } = await api('/api/donations', { method: 'POST', body: { campaignId: 'xyz', amount: 50 } })
+    assert.equal(status, 404)
+  })
+})
+
+describe('pedidos de adoção', () => {
+  test('cria o pedido e deixa o pet "Em processo"', async () => {
+    const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
+    assert.equal(status, 201)
+    assert.equal(data.petId, 'thor')
+    assert.equal(data.status, 'received')
+
+    const { data: pet } = await api('/api/pets/thor')
+    assert.equal(pet.status, 'reserved')
+
+    const saved = db.prepare('SELECT email, phone FROM adoption_requests WHERE id = ?').get(data.id)
+    assert.equal(saved.email, 'ana@exemplo.com')
+    assert.equal(saved.phone, '11912345678')
+  })
+
+  test('aceita pedido para pet já em processo', async () => {
+    const { status } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'pipoca' } })
+    assert.equal(status, 201)
+  })
+
+  test('recusa pedido para pet já adotado', async () => {
+    const { status, data } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'luna' } })
+    assert.equal(status, 409)
+    assert.match(data.message, /Luna/)
+  })
+
+  test('pet inexistente devolve 404', async () => {
+    const { status } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'xyz' } })
+    assert.equal(status, 404)
+  })
+
+  test('devolve os erros de cada campo', async () => {
+    const { status, data } = await api('/api/adoptions', { method: 'POST', body: { petId: 'thor', agreeVisit: false } })
+    assert.equal(status, 422)
+    assert.deepEqual(
+      Object.keys(data.errors).sort(),
+      ['agreeVisit', 'city', 'email', 'hasOtherPets', 'housing', 'name', 'phone']
+    )
+  })
+
+  test('JSON inválido devolve 400', async () => {
+    const { status } = await api('/api/adoptions', { method: 'POST', body: '{nao é json' })
+    assert.equal(status, 400)
+  })
+
+  test('corpo sem application/json devolve 415', async () => {
+    const { status } = await api('/api/adoptions', {
+      method: 'POST',
+      body: 'x',
+      headers: { 'Content-Type': 'text/plain' }
+    })
+    assert.equal(status, 415)
+  })
+
+  test('corpo acima do limite devolve 413', async () => {
+    const { status } = await api('/api/adoptions', {
+      method: 'POST',
+      body: { ...validAdoption, message: 'a'.repeat(200_000) }
+    })
+    assert.equal(status, 413)
+  })
+})

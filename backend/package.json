@@ -1,0 +1,16 @@
+{
+  "name": "adopet-backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "API do AdoPet em Node.js puro (sem dependências).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "seed": "node --disable-warning=ExperimentalWarning src/db/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test"
+  }
+}
