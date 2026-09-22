@@ -1,0 +1,105 @@
+/*
+ * Tokens do design system AdoPet (tokens.json).
+ * Tema claro no :root; tema escuro com data-theme="dark" no <html>.
+ */
+:root {
+  /* Cor */
+  --surface: #fff8f0;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f7ebdd;
+  --line: #e8d9c7;
+  --line-strong: #8a7462;
+  --ink: #2a1d14;
+  --ink-muted: #6b5646;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-soft: #ffe4d1;
+  --primary-strong: #9a3412;
+  --on-primary: #ffffff;
+  --secondary: #0f766e;
+  --secondary-soft: #d5f2ee;
+  --secondary-strong: #115e59;
+  --on-secondary: #ffffff;
+  --donate: #f5b300;
+  --donate-soft: #fff1c2;
+  --donate-strong: #7a4f00;
+  --on-donate: #2a1d14;
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --success-strong: #166534;
+  --warning-soft: #fef3c7;
+  --warning-strong: #92400e;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --danger-strong: #991b1b;
+  --focus: var(--primary);
+
+  /* Tipografia */
+  --font-display: Fredoka, Nunito, system-ui, sans-serif;
+  --font-sans: Nunito, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Espaço (grade de 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Raio */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  /* Sombra */
+  --shadow-sm: 0 1px 2px rgba(42, 29, 20, 0.08);
+  --shadow-md: 0 6px 20px rgba(42, 29, 20, 0.10);
+  --shadow-lg: 0 16px 40px rgba(42, 29, 20, 0.16);
+
+  /* Layout */
+  --container-max: 1200px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --surface: #1a1410;
+  --surface-raised: #241c16;
+  --surface-sunken: #120d0a;
+  --line: #3a2e25;
+  --line-strong: #8f7a69;
+  --ink: #f6ece1;
+  --ink-muted: #bfa996;
+  --primary: #fb8a4c;
+  --primary-hover: #ffa872;
+  --primary-soft: #3d2216;
+  --primary-strong: #ffb68a;
+  --on-primary: #2a1d14;
+  --secondary: #3fc1b4;
+  --secondary-soft: #11302d;
+  --secondary-strong: #7fe0d5;
+  --on-secondary: #0d1f1d;
+  --donate: #ffc933;
+  --donate-soft: #3a2e10;
+  --donate-strong: #ffd966;
+  --on-donate: #2a1d14;
+  --success: #4ade80;
+  --success-soft: #12301f;
+  --success-strong: #86efac;
+  --warning-soft: #3a2a10;
+  --warning-strong: #fcd34d;
+  --danger: #f87171;
+  --danger-soft: #3a1616;
+  --danger-strong: #fca5a5;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
+}
