@@ -52,7 +52,6 @@ frontend/src/
 ├── pages/                   Home, Adopt, PetProfile, AdoptionForm, Donate, NotFound
 ├── services/                api.js (cliente HTTP) + um serviço por recurso
 ├── hooks/                   useAsync, useTheme
-├── data/                    dados de exemplo (enquanto não há backend)
 └── utils/                   cx, formatBRL
 ```
 
@@ -70,16 +69,15 @@ frontend/src/
 
 Os serviços em `src/services` chamam a API pelo `request()` de `api.js`.
 Em desenvolvimento, o Vite repassa `/api/*` para o backend em `http://localhost:3333` (`vite.config.js`).
-Para usar o site sem o backend, defina `VITE_USE_MOCKS=true` no `frontend/.env`:
-os serviços passam a devolver os dados de `src/data`.
+Todos os dados (animais, campanhas) vêm do banco: o site precisa da API rodando.
 
 Endpoints usados:
 
 | Método | Caminho | Corpo / resposta |
 | --- | --- | --- |
-| GET | `/api/pets?species=&q=` | lista de pets (formato de `src/data/mockPets.js`) |
+| GET | `/api/pets?species=&q=` | lista de pets |
 | GET | `/api/pets/:id` | um pet, ou 404 |
-| GET | `/api/campaigns` | lista de campanhas (formato de `src/data/mockCampaigns.js`) |
+| GET | `/api/campaigns` | lista de campanhas |
 | POST | `/api/donations` | `{ campaignId, amount }` |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message, agreeVisit }` |
 

@@ -5,12 +5,13 @@ import { createApp } from '../src/app.js'
 import { config } from '../src/config.js'
 import { migrate } from '../src/db/migrate.js'
 import { createPool } from '../src/db/pool.js'
-import { seed } from '../src/db/seed.js'
+import { seed } from './fixtures/seed.js'
 
 // Os testes usam um banco próprio (TEST_DATABASE_URL), porque apagam os dados a cada teste.
 const skip = config.testDatabaseUrl ? false : 'defina TEST_DATABASE_URL no backend/.env'
 
 const ORIGIN = 'http://localhost:5173'
+const ADMIN_KEY = 'chave-de-teste'
 let db
 let server
 let baseUrl
@@ -19,7 +20,7 @@ before(async () => {
   if (skip) return
   db = createPool(config.testDatabaseUrl)
   await migrate(db)
-  server = createServer(createApp({ db, corsOrigins: [ORIGIN], log: () => {} }))
+  server = createServer(createApp({ db, corsOrigins: [ORIGIN], adminApiKey: ADMIN_KEY, log: () => {} }))
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   baseUrl = `http://127.0.0.1:${server.address().port}`
 })
@@ -128,6 +129,87 @@ describe('pets', { skip }, () => {
     const { status, data } = await api('/api/pets/nao-existe')
     assert.equal(status, 404)
     assert.equal(data.message, 'Pet não encontrado.')
+  })
+
+  test('devolve endereço, coordenadas e location montado a partir de cidade e UF', async () => {
+    const { data } = await api('/api/pets/thor')
+    assert.equal(data.neighborhood, 'Mooca')
+    assert.equal(data.city, 'São Paulo')
+    assert.equal(data.state, 'SP')
+    assert.equal(data.latitude, -23.5505)
+    assert.equal(data.location, 'São Paulo, SP')
+  })
+})
+
+describe('cadastro de pets (POST /api/pets)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const validPet = {
+    name: 'Pé de Pano',
+    species: 'cao',
+    age: '3 anos',
+    sex: 'Macho',
+    size: 'Porte grande',
+    tags: ['Vacinado', 'Castrado'],
+    story: 'Resgatado em uma chácara.',
+    photo: 'https://exemplo.com/pe-de-pano.jpg',
+    photoAlt: 'Pé de Pano, cão caramelo, deitado na grama',
+    street: 'Rua das Flores, 100',
+    neighborhood: 'Centro',
+    city: 'Campinas',
+    state: 'sp',
+    latitude: -22.9056,
+    longitude: -47.0608
+  }
+
+  test('cadastra com a chave de administrador e o pet aparece na lista', async () => {
+    const { status, data } = await api('/api/pets', { method: 'POST', body: validPet, headers: admin })
+    assert.equal(status, 201)
+    assert.match(data.id, /^pe-de-pano-[0-9a-f]{6}$/)
+    assert.equal(data.state, 'SP')
+    assert.equal(data.status, 'available')
+    assert.equal(data.location, 'Campinas, SP')
+
+    const { data: list } = await api('/api/pets?q=campinas')
+    assert.deepEqual(list.map((pet) => pet.name).sort(), ['Mel', 'Pé de Pano'])
+  })
+
+  test('sem chave devolve 401', async () => {
+    const { status } = await api('/api/pets', { method: 'POST', body: validPet })
+    assert.equal(status, 401)
+  })
+
+  test('chave errada devolve 401', async () => {
+    const { status } = await api('/api/pets', {
+      method: 'POST',
+      body: validPet,
+      headers: { Authorization: 'Bearer chave-errada' }
+    })
+    assert.equal(status, 401)
+  })
+
+  test('devolve os erros de cada campo', async () => {
+    const { status, data } = await api('/api/pets', {
+      method: 'POST',
+      headers: admin,
+      body: { name: '', species: 'peixe', sex: 'x', size: 'x', state: 'XX', latitude: 10, photo: 'ftp://x' }
+    })
+    assert.equal(status, 422)
+    assert.deepEqual(
+      Object.keys(data.errors).sort(),
+      ['age', 'city', 'latitude', 'name', 'photo', 'sex', 'size', 'species', 'state']
+    )
+  })
+
+  test('campos opcionais podem ficar de fora', async () => {
+    const { status, data } = await api('/api/pets', {
+      method: 'POST',
+      headers: admin,
+      body: { name: 'Mia', species: 'gato', age: '8 meses', sex: 'Fêmea', size: 'Porte pequeno', city: 'Recife', state: 'PE' }
+    })
+    assert.equal(status, 201)
+    assert.deepEqual(data.tags, [])
+    assert.equal(data.street, null)
+    assert.equal(data.latitude, null)
   })
 })
 

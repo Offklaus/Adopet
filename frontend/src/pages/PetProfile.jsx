@@ -42,7 +42,7 @@ export default function PetProfile() {
           <div className="profile__info">
             <h1 className="t-display-lg">{pet.name}</h1>
             <p className="t-body-lg t-muted">{[pet.age, pet.sex, pet.size].filter(Boolean).join(' · ')}</p>
-            <p className="ap-pet__loc"><Icon name="pin" size={16} />{pet.location}</p>
+            <p className="ap-pet__loc"><Icon name="pin" size={16} />{[pet.neighborhood, pet.location].filter(Boolean).join(', ')}</p>
             <div className="row">
               {pet.tags.map((tag) => <Badge key={tag} tone="secondary">{tag}</Badge>)}
             </div>

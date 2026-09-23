@@ -12,6 +12,8 @@ export const config = {
   host: process.env.HOST ?? 'localhost',
   databaseUrl: process.env.DATABASE_URL,
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
+  // Chave das rotas de administração (cadastro de animais). Vazia = rotas desligadas.
+  adminApiKey: process.env.ADMIN_API_KEY || undefined,
   corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())

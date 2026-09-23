@@ -10,10 +10,10 @@ import { registerPetsRoutes } from './modules/pets/petsRoutes.js'
  * Monta o handler HTTP da API. Separado do server.js para os testes
  * subirem a mesma aplicação com um banco em memória.
  */
-export function createApp({ db, corsOrigins = [], log = console.log }) {
+export function createApp({ db, corsOrigins = [], adminApiKey, log = console.log }) {
   const router = new Router()
   router.get('/api/health', () => ({ status: 200, body: { status: 'ok' } }))
-  registerPetsRoutes(router, db)
+  registerPetsRoutes(router, db, { adminApiKey })
   registerCampaignsRoutes(router, db)
   registerDonationsRoutes(router, db)
   registerAdoptionsRoutes(router, db)

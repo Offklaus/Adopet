@@ -3,21 +3,19 @@ import { createApp } from './app.js'
 import { config, requireDatabaseUrl } from './config.js'
 import { migrate } from './db/migrate.js'
 import { createPool, describeConnectionError } from './db/pool.js'
-import { seedIfEmpty } from './db/seed.js'
 
 const pool = createPool(requireDatabaseUrl())
 
 try {
   const applied = await migrate(pool)
   if (applied.length) console.log(`Migrações aplicadas: ${applied.join(', ')}`)
-  if (await seedIfEmpty(pool)) console.log('Banco vazio: dados iniciais criados.')
 } catch (error) {
   console.error(describeConnectionError(error))
   await pool.end()
   process.exit(1)
 }
 
-const server = createServer(createApp({ db: pool, corsOrigins: config.corsOrigins }))
+const server = createServer(createApp({ db: pool, corsOrigins: config.corsOrigins, adminApiKey: config.adminApiKey }))
 
 server.on('error', async (error) => {
   if (error.code === 'EADDRINUSE') {
