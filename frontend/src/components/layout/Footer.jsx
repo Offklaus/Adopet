@@ -20,6 +20,7 @@ export function Footer() {
               <li><Link to="/adotar">Adotar</Link></li>
               <li><Link to="/#como-funciona">Como funciona</Link></li>
               <li><Link to="/doar">Doar</Link></li>
+              <li><Link to="/admin/animais/novo">Cadastrar animal</Link></li>
             </ul>
           </nav>
         </div>

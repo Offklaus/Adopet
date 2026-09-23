@@ -12,3 +12,12 @@ export async function listPets({ species, q } = {}) {
 export async function getPet(id) {
   return request(`/pets/${encodeURIComponent(id)}`)
 }
+
+/** Cadastra um animal (administração). `adminKey` é a ADMIN_API_KEY do backend. */
+export async function createPet(data, adminKey) {
+  return request('/pets', {
+    method: 'POST',
+    body: data,
+    headers: { Authorization: `Bearer ${adminKey}` }
+  })
+}

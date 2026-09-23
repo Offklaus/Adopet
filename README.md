@@ -64,6 +64,7 @@ frontend/src/
 | `/pets/:id` | Perfil do pet |
 | `/pets/:id/adotar` | Formulário de adoção em 3 etapas |
 | `/doar` | Campanhas e doação livre |
+| `/admin/animais/novo` | Cadastro de animal (pede a `ADMIN_API_KEY` do backend; link no rodapé) |
 
 ### Integração com o backend
 
