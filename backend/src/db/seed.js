@@ -1,49 +1,57 @@
 import { pathToFileURL } from 'node:url'
-import { config } from '../config.js'
-import { openDatabase, transaction } from './database.js'
+import { requireDatabaseUrl } from '../config.js'
+import { migrate } from './migrate.js'
+import { createPool, describeConnectionError, withTransaction } from './pool.js'
 import { seedCampaigns, seedPets } from './seedData.js'
 
 /** Apaga tudo e recria os dados iniciais. */
-export function seed(db) {
-  transaction(db, () => {
-    db.exec('DELETE FROM adoption_requests; DELETE FROM donations; DELETE FROM pets; DELETE FROM campaigns;')
+export async function seed(pool) {
+  await withTransaction(pool, async (client) => {
+    await client.query('TRUNCATE adoption_requests, donations, pets, campaigns')
 
-    const insertPet = db.prepare(`
-      INSERT INTO pets (id, name, species, age, sex, size, location, tags, status, photo, photo_alt, story, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
     for (const pet of seedPets) {
-      insertPet.run(
-        pet.id, pet.name, pet.species, pet.age, pet.sex, pet.size, pet.location,
-        JSON.stringify(pet.tags), pet.status, pet.photo ?? null, pet.photoAlt ?? null, pet.story, pet.createdAt
+      await client.query(
+        `INSERT INTO pets (id, name, species, age, sex, size, location, tags, status, photo, photo_alt, story, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          pet.id, pet.name, pet.species, pet.age, pet.sex, pet.size, pet.location,
+          pet.tags, pet.status, pet.photo ?? null, pet.photoAlt ?? null, pet.story, pet.createdAt
+        ]
       )
     }
 
-    const insertCampaign = db.prepare(`
-      INSERT INTO campaigns (id, title, description, tag, raised, goal, supporters, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `)
     for (const campaign of seedCampaigns) {
-      insertCampaign.run(
-        campaign.id, campaign.title, campaign.description, campaign.tag,
-        campaign.raised, campaign.goal, campaign.supporters, campaign.createdAt
+      await client.query(
+        `INSERT INTO campaigns (id, title, description, tag, raised, goal, supporters, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          campaign.id, campaign.title, campaign.description, campaign.tag,
+          campaign.raised, campaign.goal, campaign.supporters, campaign.createdAt
+        ]
       )
     }
   })
 }
 
 /** Popula só se o banco estiver vazio (primeira execução). */
-export function seedIfEmpty(db) {
-  const { total } = db.prepare('SELECT COUNT(*) AS total FROM pets').get()
-  if (total > 0) return false
-  seed(db)
+export async function seedIfEmpty(pool) {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM pets')
+  if (rows[0].total > 0) return false
+  await seed(pool)
   return true
 }
 
-// `npm run seed`: recria os dados do banco configurado em DB_PATH.
+// `npm run seed`: recria os dados do banco de DATABASE_URL.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const db = openDatabase(config.dbPath)
-  seed(db)
-  db.close()
-  console.log(`Banco populado: ${seedPets.length} pets, ${seedCampaigns.length} campanhas (${config.dbPath}).`)
+  const pool = createPool(requireDatabaseUrl())
+  try {
+    await migrate(pool)
+    await seed(pool)
+    console.log(`Banco populado: ${seedPets.length} pets, ${seedCampaigns.length} campanhas.`)
+  } catch (error) {
+    console.error(describeConnectionError(error))
+    process.exitCode = 1
+  } finally {
+    await pool.end()
+  }
 }

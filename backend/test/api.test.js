@@ -2,8 +2,13 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { after, before, beforeEach, describe, test } from 'node:test'
 import { createApp } from '../src/app.js'
-import { openDatabase } from '../src/db/database.js'
+import { config } from '../src/config.js'
+import { migrate } from '../src/db/migrate.js'
+import { createPool } from '../src/db/pool.js'
 import { seed } from '../src/db/seed.js'
+
+// Os testes usam um banco próprio (TEST_DATABASE_URL), porque apagam os dados a cada teste.
+const skip = config.testDatabaseUrl ? false : 'defina TEST_DATABASE_URL no backend/.env'
 
 const ORIGIN = 'http://localhost:5173'
 let db
@@ -11,19 +16,24 @@ let server
 let baseUrl
 
 before(async () => {
-  db = openDatabase(':memory:')
+  if (skip) return
+  db = createPool(config.testDatabaseUrl)
+  await migrate(db)
   server = createServer(createApp({ db, corsOrigins: [ORIGIN], log: () => {} }))
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   baseUrl = `http://127.0.0.1:${server.address().port}`
 })
 
-after(() => {
+after(async () => {
+  if (skip) return
   server.close()
-  db.close()
+  await db.end()
 })
 
 // Cada teste começa com os dados iniciais.
-beforeEach(() => seed(db))
+beforeEach(async () => {
+  if (!skip) await seed(db)
+})
 
 async function api(path, { method = 'GET', body, headers } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -47,7 +57,7 @@ const validAdoption = {
   agreeVisit: true
 }
 
-describe('geral', () => {
+describe('geral', { skip }, () => {
   test('GET /api/health responde ok', async () => {
     const { status, data } = await api('/api/health')
     assert.equal(status, 200)
@@ -79,7 +89,7 @@ describe('geral', () => {
   })
 })
 
-describe('pets', () => {
+describe('pets', { skip }, () => {
   test('lista todos, mais recentes primeiro, com tags como array', async () => {
     const { status, data } = await api('/api/pets')
     assert.equal(status, 200)
@@ -121,7 +131,7 @@ describe('pets', () => {
   })
 })
 
-describe('campanhas e doações', () => {
+describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')
     assert.deepEqual(data.map((campaign) => campaign.id), ['inverno-2026', 'castracao', 'reforma-canil'])
@@ -161,7 +171,7 @@ describe('campanhas e doações', () => {
   })
 })
 
-describe('pedidos de adoção', () => {
+describe('pedidos de adoção', { skip }, () => {
   test('cria o pedido e deixa o pet "Em processo"', async () => {
     const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
     assert.equal(status, 201)
@@ -171,7 +181,7 @@ describe('pedidos de adoção', () => {
     const { data: pet } = await api('/api/pets/thor')
     assert.equal(pet.status, 'reserved')
 
-    const saved = db.prepare('SELECT email, phone FROM adoption_requests WHERE id = ?').get(data.id)
+    const { rows: [saved] } = await db.query('SELECT email, phone FROM adoption_requests WHERE id = $1', [data.id])
     assert.equal(saved.email, 'ana@exemplo.com')
     assert.equal(saved.phone, '11912345678')
   })

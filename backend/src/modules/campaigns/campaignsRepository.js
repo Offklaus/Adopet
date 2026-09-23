@@ -13,17 +13,16 @@ function toCampaign(row) {
 }
 
 export function createCampaignsRepository(db) {
-  const listActiveStmt = db.prepare('SELECT * FROM campaigns WHERE active = 1 ORDER BY created_at DESC')
-  const findActiveStmt = db.prepare('SELECT * FROM campaigns WHERE id = ? AND active = 1')
-
   return {
     /** Campanhas ativas, a mais recente primeiro (a home destaca a primeira). */
-    listActive() {
-      return listActiveStmt.all().map(toCampaign)
+    async listActive() {
+      const { rows } = await db.query('SELECT * FROM campaigns WHERE active ORDER BY created_at DESC')
+      return rows.map(toCampaign)
     },
 
-    findActiveById(id) {
-      return toCampaign(findActiveStmt.get(id))
+    async findActiveById(id) {
+      const { rows } = await db.query('SELECT * FROM campaigns WHERE id = $1 AND active', [id])
+      return toCampaign(rows[0])
     }
   }
 }

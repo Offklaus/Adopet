@@ -5,10 +5,11 @@ Site de adoção e doação de animais.
 ```
 Adopet/
 ├── frontend/   React 18 + Vite (JavaScript)
-└── backend/    Node.js puro: node:http + node:sqlite, sem dependências
+└── backend/    Node.js puro (node:http, sem framework) + PostgreSQL
 ```
 
-Para rodar tudo em desenvolvimento, abra dois terminais:
+Na primeira vez, configure o banco seguindo [backend/README.md](backend/README.md#primeira-vez).
+Depois, para rodar tudo em desenvolvimento, abra dois terminais:
 
 ```bash
 cd backend && npm run dev     # API em http://localhost:3333/api

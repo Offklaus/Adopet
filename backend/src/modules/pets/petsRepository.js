@@ -10,7 +10,7 @@ function toPet(row) {
     sex: row.sex,
     size: row.size,
     location: row.location,
-    tags: JSON.parse(row.tags),
+    tags: row.tags,
     status: row.status,
     photo: row.photo,
     photoAlt: row.photo_alt,
@@ -19,34 +19,41 @@ function toPet(row) {
   }
 }
 
+/** `db` é o pool ou, dentro de uma transação, o client dela. */
 export function createPetsRepository(db) {
-  const findByIdStmt = db.prepare('SELECT * FROM pets WHERE id = ?')
-  const updateStatusStmt = db.prepare('UPDATE pets SET status = ? WHERE id = ?')
-
   return {
     /** Filtros opcionais: species ('cao' | 'gato') e q (nome ou cidade). Mais recentes primeiro. */
-    list({ species, q } = {}) {
+    async list({ species, q } = {}) {
       const where = []
       const params = []
       if (species) {
-        where.push('species = ?')
         params.push(species)
+        where.push(`species = $${params.length}`)
       }
       if (q) {
-        const term = `%${escapeLike(q)}%`
-        where.push("(name LIKE ? ESCAPE '\\' OR location LIKE ? ESCAPE '\\')")
-        params.push(term, term)
+        params.push(`%${escapeLike(q)}%`)
+        where.push(`(name ILIKE $${params.length} OR location ILIKE $${params.length})`)
       }
-      const sql = `SELECT * FROM pets ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`
-      return db.prepare(sql).all(...params).map(toPet)
+      const { rows } = await db.query(
+        `SELECT * FROM pets ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`,
+        params
+      )
+      return rows.map(toPet)
     },
 
-    findById(id) {
-      return toPet(findByIdStmt.get(id))
+    async findById(id) {
+      const { rows } = await db.query('SELECT * FROM pets WHERE id = $1', [id])
+      return toPet(rows[0])
     },
 
-    updateStatus(id, status) {
-      updateStatusStmt.run(status, id)
+    /** Lê o pet travando a linha até o fim da transação (evita dois pedidos mudarem o status juntos). */
+    async findByIdForUpdate(id) {
+      const { rows } = await db.query('SELECT * FROM pets WHERE id = $1 FOR UPDATE', [id])
+      return toPet(rows[0])
+    },
+
+    async updateStatus(id, status) {
+      await db.query('UPDATE pets SET status = $1 WHERE id = $2', [status, id])
     }
   }
 }

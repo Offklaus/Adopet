@@ -1,4 +1,4 @@
-import { transaction } from '../../db/database.js'
+import { withTransaction } from '../../db/pool.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, isEmail, isPhone, requiredText } from '../../lib/validate.js'
 import { createPetsRepository } from '../pets/petsRepository.js'
@@ -23,22 +23,22 @@ function validateAdoption(body) {
   assertValid(errors)
 }
 
-export function registerAdoptionsRoutes(router, db) {
-  const pets = createPetsRepository(db)
-  const adoptions = createAdoptionsRepository(db)
-
+export function registerAdoptionsRoutes(router, pool) {
   // POST /api/adoptions  { petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit }
   router.post('/api/adoptions', async ({ req }) => {
     const body = await readJson(req)
     assertBodyIsObject(body)
     validateAdoption(body)
 
-    const created = transaction(db, () => {
-      const pet = pets.findById(body.petId)
+    const created = await withTransaction(pool, async (client) => {
+      const pets = createPetsRepository(client)
+      const adoptions = createAdoptionsRepository(client)
+
+      const pet = await pets.findByIdForUpdate(body.petId)
       if (!pet) throw new HttpError(404, 'Pet não encontrado.')
       if (pet.status === 'adopted') throw new HttpError(409, `${pet.name} já foi adotado.`)
 
-      const request = adoptions.create({
+      const request = await adoptions.create({
         petId: pet.id,
         name: body.name.trim(),
         email: body.email.trim().toLowerCase(),
@@ -50,7 +50,7 @@ export function registerAdoptionsRoutes(router, db) {
         agreeVisit: true
       })
       // O primeiro pedido deixa o pet "Em processo" no site.
-      if (pet.status === 'available') pets.updateStatus(pet.id, 'reserved')
+      if (pet.status === 'available') await pets.updateStatus(pet.id, 'reserved')
       return request
     })
 

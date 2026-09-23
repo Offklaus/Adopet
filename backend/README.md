@@ -1,40 +1,53 @@
 # AdoPet — backend
 
-API do AdoPet em **Node.js puro**: só módulos nativos, nenhuma dependência no `package.json`.
+API do AdoPet em **Node.js puro** (sem framework) com **PostgreSQL**.
 
 | Precisa de | Usa |
 | --- | --- |
-| Servidor HTTP | `node:http` |
-| Banco de dados | `node:sqlite` (SQLite embutido no Node) |
+| Servidor HTTP | `node:http` e um roteador próprio (`src/lib/router.js`) |
+| Banco de dados | PostgreSQL, pelo pacote `pg` (única dependência) |
 | Variáveis de ambiente | `process.loadEnvFile` |
-| IDs | `crypto.randomUUID` |
 | Testes | `node:test` + `fetch` |
 
-Requer **Node 22.13 ou mais novo**.
+Requer **Node 20.12 ou mais novo** e **PostgreSQL 13 ou mais novo**.
 
-## Rodando
+## Primeira vez
 
-```bash
-cd backend
-cp .env.example .env    # opcional: os valores padrão já funcionam
-npm run dev             # reinicia ao salvar; API em http://localhost:3333/api
-```
-
-Na primeira execução o banco (`data/adopet.db`) é criado e populado com os pets e campanhas de exemplo.
+1. Crie o arquivo de configuração e coloque a senha do seu usuário do Postgres nas duas URLs:
+   ```bash
+   cp .env.example .env
+   ```
+2. Instale a dependência e crie os bancos `adopet` e `adopet_test`:
+   ```bash
+   npm install
+   npm run db:create
+   ```
+3. Suba a API. Na primeira execução ela cria as tabelas (migrações) e os dados de exemplo:
+   ```bash
+   npm run dev
+   ```
 
 | Script | O que faz |
 | --- | --- |
-| `npm run dev` | Sobe a API com `--watch` |
+| `npm run dev` | Sobe a API com `--watch` em http://localhost:3333/api |
 | `npm start` | Sobe a API |
-| `npm run seed` | Apaga os dados e recria os dados iniciais |
-| `npm test` | Roda os testes com banco em memória |
+| `npm run db:create` | Cria os bancos de `DATABASE_URL` e `TEST_DATABASE_URL`, se não existirem |
+| `npm run db:migrate` | Aplica as migrações pendentes (a API também faz isso ao subir) |
+| `npm run seed` | Apaga os dados e recria os dados de exemplo |
+| `npm test` | Roda os testes no banco de `TEST_DATABASE_URL` |
+
+## Migrações
+
+Cada mudança no banco é um arquivo em `src/db/migrations/`, numerado em ordem (`001_initial.sql`, `002_...sql`).
+Cada arquivo roda uma única vez, dentro de uma transação, e fica registrado na tabela `schema_migrations`.
+Para mudar o banco, **crie um arquivo novo**. Não edite uma migração que já foi aplicada.
 
 ## Estrutura
 
 ```
 backend/
 ├── src/
-│   ├── server.js            sobe o servidor HTTP e encerra com segurança (Ctrl+C)
+│   ├── server.js            aplica migrações, sobe o servidor e encerra com segurança (Ctrl+C)
 │   ├── app.js               monta as rotas; trata CORS, erros e log
 │   ├── config.js            lê o .env
 │   ├── lib/
@@ -43,9 +56,11 @@ backend/
 │   │   ├── cors.js          libera só as origens de CORS_ORIGIN
 │   │   └── validate.js      validações reutilizáveis
 │   ├── db/
-│   │   ├── schema.sql       tabelas
-│   │   ├── database.js      abre o banco e aplica o esquema; transaction()
-│   │   ├── seed.js          dados iniciais (npm run seed)
+│   │   ├── pool.js          conexão com o Postgres e withTransaction()
+│   │   ├── migrate.js       executor de migrações (npm run db:migrate)
+│   │   ├── migrations/      001_initial.sql, ...
+│   │   ├── createDatabase.js cria os bancos (npm run db:create)
+│   │   ├── seed.js          dados de exemplo (npm run seed)
 │   │   └── seedData.js
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
 │       ├── pets/
@@ -69,5 +84,5 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |
 
 Regras de negócio:
-- **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). E-mail é salvo em minúsculas e telefone só com dígitos.
+- **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com dígitos.
 - **Doação:** fica `pending`. O valor só deve entrar em `raised` da campanha quando o pagamento for confirmado (ainda não há integração de pagamento).

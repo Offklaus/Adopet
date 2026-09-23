@@ -1,16 +1,14 @@
-import { randomUUID } from 'node:crypto'
-
 export function createDonationsRepository(db) {
-  const insertStmt = db.prepare(`
-    INSERT INTO donations (id, campaign_id, amount)
-    VALUES (?, ?, ?)
-    RETURNING id, campaign_id, amount, status, created_at
-  `)
-
   return {
     /** Registra a doação como 'pending'; o valor só entra na meta quando o pagamento for confirmado. */
-    create({ campaignId, amount }) {
-      const row = insertStmt.get(randomUUID(), campaignId, amount)
+    async create({ campaignId, amount }) {
+      const { rows } = await db.query(
+        `INSERT INTO donations (campaign_id, amount)
+         VALUES ($1, $2)
+         RETURNING id, campaign_id, amount, status, created_at`,
+        [campaignId, amount]
+      )
+      const row = rows[0]
       return {
         id: row.id,
         campaignId: row.campaign_id,

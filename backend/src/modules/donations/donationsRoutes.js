@@ -25,10 +25,10 @@ export function registerDonationsRoutes(router, db) {
     }
     assertValid(errors)
 
-    if (campaignId && !campaigns.findActiveById(campaignId)) {
+    if (campaignId && !(await campaigns.findActiveById(campaignId))) {
       throw new HttpError(404, 'Campanha não encontrada ou encerrada.')
     }
 
-    return { status: 201, body: donations.create({ campaignId, amount: body.amount }) }
+    return { status: 201, body: await donations.create({ campaignId, amount: body.amount }) }
   })
 }
