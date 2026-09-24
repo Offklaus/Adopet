@@ -22,6 +22,14 @@ export async function createPet(data, adminKey) {
   })
 }
 
+/** Exclui um animal (administração). A API recusa (409) se ele tiver pedidos de adoção. */
+export async function deletePet(id, adminKey) {
+  return request(`/pets/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminKey}` }
+  })
+}
+
 /** Edita um animal (administração). Envia o cadastro completo, como no createPet. */
 export async function updatePet(id, data, adminKey) {
   return request(`/pets/${encodeURIComponent(id)}`, {

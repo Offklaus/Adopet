@@ -19,6 +19,8 @@
 .ap-btn--outline:hover { background: var(--surface-sunken); }
 .ap-btn--ghost { background: transparent; color: var(--primary); }
 .ap-btn--ghost:hover { background: var(--primary-soft); color: var(--primary-strong); }
+.ap-btn--danger { background: var(--danger-soft); color: var(--danger-strong); border-color: var(--danger); }
+.ap-btn--danger:hover { background: var(--danger); color: var(--surface-raised); }
 .ap-btn[disabled], .ap-btn[aria-disabled="true"] { background: var(--surface-sunken); color: var(--ink-muted); border-color: var(--line); cursor: not-allowed; filter: none; transform: none; }
 
 /* Badge */

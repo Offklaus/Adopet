@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
-import { Badge, Button, Icon, TextField } from '../components/ui'
+import { Alert, Badge, Button, Icon, TextField } from '../components/ui'
 import { useAsync } from '../hooks/useAsync'
 import { listPets } from '../services/petsService'
 
@@ -16,6 +17,15 @@ const STATUS_BADGE = {
 export default function AdminPets() {
   const pets = useAsync(() => listPets(), [])
   const [query, setQuery] = useState('')
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Aviso vindo da página de edição depois de excluir um animal.
+  const [deletedName] = useState(location.state?.deletedName)
+
+  // Limpa o aviso do histórico para ele não voltar ao recarregar a página.
+  useEffect(() => {
+    if (location.state?.deletedName) navigate(location.pathname, { replace: true, state: null })
+  }, [location, navigate])
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -33,6 +43,10 @@ export default function AdminPets() {
           </div>
           <Button to="/admin/animais/novo" icon="paw">Cadastrar animal</Button>
         </div>
+
+        {deletedName && (
+          <Alert tone="success" title={`${deletedName} foi excluído`}>Ele não aparece mais no site.</Alert>
+        )}
 
         <TextField
           label="Filtrar por nome ou cidade"

@@ -177,7 +177,9 @@ export function PetForm({
   successTitle,
   successText,
   clearAfterSuccess = false,
-  backTo
+  backTo,
+  // Opcional: com ele aparece a seção "Excluir animal". Recebe a chave de administrador.
+  onDelete
 }) {
   const [baseline, setBaseline] = useState(() => (initialPet ? petToValues(initialPet) : EMPTY_PET))
   const [values, setValues] = useState(baseline)
@@ -185,6 +187,8 @@ export function PetForm({
   const [sending, setSending] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [photoBroken, setPhotoBroken] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const { adminKey, setAdminKey, remember, setRemember, persist } = useAdminKey()
 
   const tagCount = values.tags.length + values.extraTags.length
@@ -253,6 +257,32 @@ export function PetForm({
       }
     } finally {
       setSending(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!adminKey.trim()) {
+      setErrors({ adminKey: 'Informe a chave de administrador.' })
+      setConfirmingDelete(false)
+      showFeedback({ tone: 'danger', title: 'Informe a chave de administrador para excluir.' })
+      return
+    }
+    persist()
+    setDeleting(true)
+    try {
+      // Em caso de sucesso a página sai daqui (volta para a lista).
+      await onDelete(adminKey.trim())
+    } catch (error) {
+      setDeleting(false)
+      setConfirmingDelete(false)
+      if (error.status === 401) {
+        setErrors({ adminKey: 'Chave de administrador inválida.' })
+        showFeedback({ tone: 'danger', title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
+      } else if (error.status === 409) {
+        showFeedback({ tone: 'warning', title: 'Não é possível excluir', text: error.message })
+      } else {
+        showFeedback({ tone: 'danger', title: 'Não foi possível excluir', text: error.message })
+      }
     }
   }
 
@@ -381,6 +411,28 @@ export function PetForm({
           <Button variant="ghost" onClick={reset}>{resetLabel}</Button>
           <Button type="submit" disabled={sending}>{sending ? sendingLabel : submitLabel}</Button>
         </div>
+
+        {onDelete && (
+          <fieldset className="form-section form-section--danger">
+            <legend className="t-heading-sm">Excluir animal</legend>
+            <p className="t-body-sm t-muted">
+              Remove {baseline.name} do banco de dados e do site. Não dá para desfazer.
+              Se ele foi adotado, prefira mudar a situação para "Já adotado".
+            </p>
+            {confirmingDelete ? (
+              <div className="row">
+                <Button variant="ghost" onClick={() => setConfirmingDelete(false)} disabled={deleting}>Cancelar</Button>
+                <Button variant="danger" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Excluindo…' : `Sim, excluir ${baseline.name}`}
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Button variant="danger" icon="x" onClick={() => setConfirmingDelete(true)}>Excluir animal</Button>
+              </div>
+            )}
+          </fieldset>
+        )}
       </form>
     </section>
   )

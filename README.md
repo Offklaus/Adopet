@@ -66,7 +66,7 @@ frontend/src/
 | `/doar` | Campanhas e doação livre |
 | `/admin/animais` | Área administrativa: lista dos animais cadastrados (link "Área administrativa" no rodapé) |
 | `/admin/animais/novo` | Cadastro de animal (pede a `ADMIN_API_KEY` do backend) |
-| `/admin/animais/:id/editar` | Edição de um animal (pede a `ADMIN_API_KEY` do backend) |
+| `/admin/animais/:id/editar` | Edição e exclusão de um animal (pede a `ADMIN_API_KEY` do backend) |
 
 ### Integração com o backend
 

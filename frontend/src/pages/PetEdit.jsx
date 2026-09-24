@@ -1,13 +1,14 @@
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { PetForm } from '../components/pets/PetForm'
 import { useAsync } from '../hooks/useAsync'
-import { getPet, updatePet } from '../services/petsService'
+import { deletePet, getPet, updatePet } from '../services/petsService'
 import NotFound from './NotFound'
 
 export default function PetEdit() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const pet = useAsync(() => getPet(id), [id])
 
   if (pet.loading) return <LoadingState />
@@ -32,6 +33,10 @@ export default function PetEdit() {
       resetLabel="Desfazer alterações"
       onSubmit={(payload, adminKey) => updatePet(id, payload, adminKey)}
       successTitle={() => 'Alterações salvas'}
+      onDelete={async (adminKey) => {
+        await deletePet(id, adminKey)
+        navigate('/admin/animais', { state: { deletedName: pet.data.name } })
+      }}
     />
   )
 }

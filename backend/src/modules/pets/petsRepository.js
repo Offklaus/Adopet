@@ -107,6 +107,18 @@ export function createPetsRepository(db) {
       return toPet(rows[0])
     },
 
+    /** Quantos pedidos de adoção apontam para o pet (impedem a exclusão). */
+    async countAdoptionRequests(id) {
+      const { rows } = await db.query('SELECT COUNT(*)::int AS total FROM adoption_requests WHERE pet_id = $1', [id])
+      return rows[0].total
+    },
+
+    /** Exclui o pet. Devolve false se ele não existia. */
+    async remove(id) {
+      const { rowCount } = await db.query('DELETE FROM pets WHERE id = $1', [id])
+      return rowCount > 0
+    },
+
     async updateStatus(id, status) {
       await db.query('UPDATE pets SET status = $1 WHERE id = $2', [status, id])
     }

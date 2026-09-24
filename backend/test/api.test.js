@@ -269,6 +269,43 @@ describe('edição de pets (PUT /api/pets/:id)', { skip }, () => {
   })
 })
 
+describe('exclusão de pets (DELETE /api/pets/:id)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+
+  test('exclui um pet sem pedidos de adoção', async () => {
+    const { status, data } = await api('/api/pets/bento', { method: 'DELETE', headers: admin })
+    assert.equal(status, 200)
+    assert.deepEqual(data, { id: 'bento', deleted: true })
+
+    const { status: depois } = await api('/api/pets/bento')
+    assert.equal(depois, 404)
+    const { data: lista } = await api('/api/pets')
+    assert.equal(lista.length, 5)
+  })
+
+  test('recusa (409) se houver pedido de adoção e mantém o pet', async () => {
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' } })
+    const { status, data } = await api('/api/pets/thor', { method: 'DELETE', headers: admin })
+    assert.equal(status, 409)
+    assert.match(data.message, /Thor tem 1 pedido/)
+
+    const { status: aindaExiste } = await api('/api/pets/thor')
+    assert.equal(aindaExiste, 200)
+  })
+
+  test('pet inexistente devolve 404', async () => {
+    const { status } = await api('/api/pets/nao-existe', { method: 'DELETE', headers: admin })
+    assert.equal(status, 404)
+  })
+
+  test('sem chave devolve 401 e não exclui', async () => {
+    const { status } = await api('/api/pets/bento', { method: 'DELETE' })
+    assert.equal(status, 401)
+    const { status: aindaExiste } = await api('/api/pets/bento')
+    assert.equal(aindaExiste, 200)
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')

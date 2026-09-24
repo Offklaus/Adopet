@@ -120,4 +120,29 @@ export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
     if (!pet) throw new HttpError(404, 'Pet não encontrado.')
     return { status: 200, body: pet }
   })
+
+  // DELETE /api/pets/:id (administração): exclui um animal sem pedidos de adoção.
+  router.delete('/api/pets/:id', async ({ req, params }) => {
+    requireAdmin(req, adminApiKey)
+    const pet = await pets.findById(params.id)
+    if (!pet) throw new HttpError(404, 'Pet não encontrado.')
+
+    const blocked = (total) =>
+      new HttpError(
+        409,
+        `${pet.name} tem ${total} pedido(s) de adoção registrado(s). Para manter o histórico, ` +
+          'mude a situação para "Já adotado" em vez de excluir.'
+      )
+    const requests = await pets.countAdoptionRequests(pet.id)
+    if (requests > 0) throw blocked(requests)
+
+    try {
+      await pets.remove(pet.id)
+    } catch (error) {
+      // Um pedido chegou entre a contagem e a exclusão: a chave estrangeira impede apagar.
+      if (error.code === '23503') throw blocked(await pets.countAdoptionRequests(pet.id))
+      throw error
+    }
+    return { status: 200, body: { id: pet.id, deleted: true } }
+  })
 }
