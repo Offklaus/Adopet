@@ -11,6 +11,7 @@ const Donate = lazy(() => import('./pages/Donate'))
 const PetRegister = lazy(() => import('./pages/PetRegister'))
 const PetEdit = lazy(() => import('./pages/PetEdit'))
 const AdminPets = lazy(() => import('./pages/AdminPets'))
+const AdminAdoptions = lazy(() => import('./pages/AdminAdoptions'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="admin/animais" element={<AdminPets />} />
         <Route path="admin/animais/novo" element={<PetRegister />} />
         <Route path="admin/animais/:id/editar" element={<PetEdit />} />
+        <Route path="admin/pedidos" element={<AdminAdoptions />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

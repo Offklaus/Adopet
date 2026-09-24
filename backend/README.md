@@ -88,6 +88,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
+| GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |
 
 ### Cadastrar um animal

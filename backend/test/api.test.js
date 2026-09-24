@@ -306,6 +306,48 @@ describe('exclusão de pets (DELETE /api/pets/:id)', { skip }, () => {
   })
 })
 
+describe('listagem de pedidos de adoção (GET /api/adoptions)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+
+  test('lista os pedidos com o nome do animal, mais recentes primeiro', async () => {
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor', name: 'Primeira Pessoa' } })
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel', name: 'Segunda Pessoa' } })
+
+    const { status, data } = await api('/api/adoptions', { headers: admin })
+    assert.equal(status, 200)
+    assert.equal(data.length, 2)
+    assert.equal(data[0].name, 'Segunda Pessoa')
+    assert.equal(data[0].petName, 'Mel')
+    assert.equal(data[0].petStatus, 'reserved')
+    assert.equal(data[0].email, 'ana@exemplo.com')
+    assert.equal(data[0].phone, '11912345678')
+    assert.equal(data[0].housing, 'apartamento')
+    assert.equal(data[0].status, 'received')
+  })
+
+  test('filtra por animal e por status', async () => {
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' } })
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel' } })
+
+    const { data: doThor } = await api('/api/adoptions?petId=thor', { headers: admin })
+    assert.deepEqual(doThor.map((request) => request.petId), ['thor'])
+
+    const { data: aprovados } = await api('/api/adoptions?status=approved', { headers: admin })
+    assert.equal(aprovados.length, 0)
+  })
+
+  test('status inválido devolve 400', async () => {
+    const { status } = await api('/api/adoptions?status=xyz', { headers: admin })
+    assert.equal(status, 400)
+  })
+
+  test('sem chave devolve 401 (os pedidos têm dados pessoais)', async () => {
+    const { status, data } = await api('/api/adoptions')
+    assert.equal(status, 401)
+    assert.equal(Array.isArray(data), false)
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')

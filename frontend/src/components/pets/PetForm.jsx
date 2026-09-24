@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAdminKey } from '../../hooks/useAdminKey'
-import { Alert, Button, Checkbox, Chip, TextField } from '../ui'
+import { AdminKeyField } from '../admin/AdminKeyField'
+import { Alert, Button, Chip, TextField } from '../ui'
 
 const MAX_TAGS = 5
 
@@ -316,18 +317,12 @@ export function PetForm({
 
         <fieldset className="form-section">
           <legend className="t-heading-sm">Acesso</legend>
-          <TextField
-            label="Chave de administrador"
-            type="password"
-            autoComplete="off"
-            value={adminKey}
-            onChange={(event) => setAdminKey(event.target.value)}
+          <AdminKeyField
+            adminKey={adminKey}
+            setAdminKey={setAdminKey}
+            remember={remember}
+            setRemember={setRemember}
             error={errors.adminKey}
-          />
-          <Checkbox
-            label="Lembrar a chave até fechar esta aba"
-            checked={remember}
-            onChange={(event) => setRemember(event.target.checked)}
           />
         </fieldset>
 

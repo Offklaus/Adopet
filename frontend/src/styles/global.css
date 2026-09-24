@@ -147,6 +147,37 @@ img { max-width: 100%; }
   .admin-row__actions .ap-btn { flex: 1; }
 }
 
+/* Pedidos de adoção (/admin/pedidos) */
+.admin-key-card {
+  max-width: 520px; display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-6); background: var(--surface-raised);
+  border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+}
+.request-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.request-card {
+  display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6);
+  background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+}
+.request-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); flex-wrap: wrap; }
+.request-card__head p { margin: 0; }
+.request-card__pet {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 28px;
+}
+.request-card__pet a { color: var(--ink); text-decoration: none; }
+.request-card__pet a:hover { text-decoration: underline; }
+.request-card__data { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3) var(--space-6); }
+.request-card__data dt { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-muted); }
+.request-card__data dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.request-card__message {
+  margin: 0; padding: var(--space-3) var(--space-4); background: var(--surface-sunken);
+  border-radius: var(--radius-md); font-size: 15px; line-height: 22px; white-space: pre-line;
+}
+@media (max-width: 767px) {
+  .request-card { padding: var(--space-4); }
+  .request-card__data { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .photo-preview { width: 200px; max-width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--primary-soft); }
 @media (max-width: 767px) {
   .form-card { padding: var(--space-6) var(--space-4); }

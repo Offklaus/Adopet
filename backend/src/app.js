@@ -16,7 +16,7 @@ export function createApp({ db, corsOrigins = [], adminApiKey, log = console.log
   registerPetsRoutes(router, db, { adminApiKey })
   registerCampaignsRoutes(router, db)
   registerDonationsRoutes(router, db)
-  registerAdoptionsRoutes(router, db)
+  registerAdoptionsRoutes(router, db, { adminApiKey })
 
   return async function handleRequest(req, res) {
     const startedAt = performance.now()

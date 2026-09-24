@@ -41,7 +41,10 @@ export default function AdminPets() {
             <h1 className="t-display-lg">Animais cadastrados</h1>
             {pets.data && <p className="t-muted">{pets.data.length} no banco de dados</p>}
           </div>
-          <Button to="/admin/animais/novo" icon="paw">Cadastrar animal</Button>
+          <div className="row">
+            <Button variant="outline" to="/admin/pedidos">Pedidos de adoção</Button>
+            <Button to="/admin/animais/novo" icon="paw">Cadastrar animal</Button>
+          </div>
         </div>
 
         {deletedName && (

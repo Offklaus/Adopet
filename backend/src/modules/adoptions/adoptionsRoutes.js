@@ -1,10 +1,12 @@
 import { withTransaction } from '../../db/pool.js'
+import { requireAdmin } from '../../lib/auth.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, isEmail, isPhone, requiredText } from '../../lib/validate.js'
 import { createPetsRepository } from '../pets/petsRepository.js'
 import { createAdoptionsRepository } from './adoptionsRepository.js'
 
 const HOUSING = ['casa-quintal', 'casa', 'apartamento']
+const STATUSES = ['received', 'approved', 'rejected']
 
 /** Mesmas regras do formulário do frontend (AdoptionForm.jsx). */
 function validateAdoption(body) {
@@ -23,7 +25,18 @@ function validateAdoption(body) {
   assertValid(errors)
 }
 
-export function registerAdoptionsRoutes(router, pool) {
+export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
+  // GET /api/adoptions?status=&petId= (administração): tem dados pessoais, exige a chave.
+  router.get('/api/adoptions', async ({ req, query }) => {
+    requireAdmin(req, adminApiKey)
+    const status = query.get('status') || undefined
+    const petId = query.get('petId') || undefined
+    if (status && !STATUSES.includes(status)) {
+      throw new HttpError(400, `Status inválido. Use ${STATUSES.join(', ')}.`)
+    }
+    return { status: 200, body: await createAdoptionsRepository(pool).list({ status, petId }) }
+  })
+
   // POST /api/adoptions  { petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit }
   router.post('/api/adoptions', async ({ req }) => {
     const body = await readJson(req)
