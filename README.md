@@ -64,6 +64,7 @@ frontend/src/
 | `/pets/:id` | Perfil do pet |
 | `/pets/:id/adotar` | Formulário de adoção em 3 etapas |
 | `/doar` | Campanhas e doação livre |
+| `/entrar` | Entrar ou criar conta (e-mail e senha, ou conta do Google). `?modo=cadastro` abre em "Criar conta"; `?voltar=/caminho` volta para a página depois de entrar |
 | `/admin/animais` | Área administrativa: lista dos animais cadastrados (link "Área administrativa" no rodapé) |
 | `/admin/animais/novo` | Cadastro de animal (pede a `ADMIN_API_KEY` do backend) |
 | `/admin/animais/:id/editar` | Edição e exclusão de um animal (pede a `ADMIN_API_KEY` do backend) |

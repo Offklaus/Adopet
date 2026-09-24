@@ -121,7 +121,7 @@ textarea.ap-field__control { height: auto; padding: var(--space-3) var(--space-4
 .ap-nav__brand span { color: var(--ink); }
 .ap-nav nav { flex: 1; }
 .ap-nav__links { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--space-2); }
-.ap-nav__link { display: inline-block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); text-decoration: none; color: var(--ink-muted); font-weight: 700; font-size: 15px; }
+.ap-nav__link { display: inline-block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); text-decoration: none; color: var(--ink-muted); font-weight: 700; font-size: 15px; white-space: nowrap; }
 .ap-nav__link:hover { color: var(--ink); background: var(--surface-sunken); }
 .ap-nav__link.is-active { color: var(--primary-strong); background: var(--primary-soft); }
 .ap-nav__actions { display: flex; align-items: center; gap: var(--space-2); }
@@ -129,7 +129,13 @@ textarea.ap-field__control { height: auto; padding: var(--space-3) var(--space-4
 .ap-nav__icon-btn:hover { background: var(--surface-sunken); }
 .ap-nav__menu-btn { display: none; }
 .ap-nav__mobile { display: none; }
-@media (max-width: 860px) {
+/* Entre 1024 e 1279px a barra fica justa: menos espaço entre blocos e sem o "Olá, nome". */
+@media (max-width: 1279px) {
+  .ap-nav__bar { gap: var(--space-4); }
+  .ap-nav__user { display: none; }
+}
+/* Navbar completa só a partir de breakpoint-lg (1024px), como no design system. */
+@media (max-width: 1023px) {
   .ap-nav__bar { justify-content: space-between; gap: var(--space-2); padding: 0 var(--space-4); }
   .ap-nav nav { display: none; }
   .ap-nav__menu-btn { display: inline-flex; }

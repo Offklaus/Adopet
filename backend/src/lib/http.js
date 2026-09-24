@@ -8,9 +8,10 @@ export class HttpError extends Error {
   }
 }
 
-export function sendJson(res, status, data) {
+export function sendJson(res, status, data, headers = {}) {
   const body = data === undefined ? '' : JSON.stringify(data)
   res.writeHead(status, {
+    ...headers,
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body)
   })

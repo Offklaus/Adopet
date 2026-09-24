@@ -4,7 +4,7 @@ import { seedCampaigns, seedPets } from './seedData.js'
 /** Apaga tudo e recria os dados fixos. Use só no banco de testes. */
 export async function seed(pool) {
   await withTransaction(pool, async (client) => {
-    await client.query('TRUNCATE adoption_requests, donations, pets, campaigns')
+    await client.query('TRUNCATE adoption_requests, donations, pets, campaigns, sessions, users')
 
     for (const pet of seedPets) {
       await client.query(

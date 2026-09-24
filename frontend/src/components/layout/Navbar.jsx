@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../hooks/useTheme'
 import { cx } from '../../utils/cx'
 import { Button, Icon } from '../ui'
@@ -18,7 +19,11 @@ function linkClass({ isActive }) {
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const { user, logout } = useAuth()
   const location = useLocation()
+  const firstName = user?.name.split(' ')[0]
+  // Depois de entrar, volta para a página em que a pessoa estava.
+  const loginHref = location.pathname === '/entrar' ? '/entrar' : `/entrar?voltar=${encodeURIComponent(location.pathname + location.search)}`
 
   // Fecha o menu mobile ao trocar de página.
   useEffect(() => setMenuOpen(false), [location.pathname, location.hash])
@@ -54,6 +59,14 @@ export function Navbar() {
           >
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={20} />
           </button>
+          {user ? (
+            <>
+              <span className="ap-nav__user ap-nav__cta" title={user.email}>Olá, {firstName}</span>
+              <Button variant="ghost" size="sm" onClick={logout} className="ap-nav__cta" title={`Sair da conta de ${user.name}`}>Sair</Button>
+            </>
+          ) : (
+            <Button variant="ghost" size="sm" to={loginHref} className="ap-nav__cta">Entrar</Button>
+          )}
           <Button variant="donate" size="sm" icon="heart" to="/doar" className="ap-nav__cta">Doar</Button>
           <Button variant="primary" size="sm" to="/adotar" className="ap-nav__cta">Quero adotar</Button>
           <button
@@ -73,6 +86,11 @@ export function Navbar() {
         <ul className="ap-nav__links" style={{ flexDirection: 'column' }}>{links}</ul>
         <Button variant="donate" icon="heart" to="/doar" full>Doar</Button>
         <Button variant="primary" to="/adotar" full>Quero adotar</Button>
+        {user ? (
+          <Button variant="outline" onClick={logout} full>Sair ({firstName})</Button>
+        ) : (
+          <Button variant="outline" to={loginHref} full>Entrar ou criar conta</Button>
+        )}
       </div>
     </header>
   )

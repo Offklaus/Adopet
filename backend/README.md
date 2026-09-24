@@ -64,7 +64,11 @@ backend/
 │   │   ├── migrations/      001_initial.sql, ...
 │   │   └── createDatabase.js cria os bancos (npm run db:create)
 │   ├── lib/auth.js          exige a chave de administrador nas rotas de cadastro
+│   ├── lib/password.js      hash scrypt das senhas
+│   ├── lib/cookies.js       leitura e escrita de cookies
+│   ├── lib/google.js        verificação do token do "Entrar com o Google"
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
+│       ├── auth/            contas, login, Google e sessões
 │       ├── pets/
 │       ├── campaigns/
 │       ├── donations/
@@ -90,6 +94,31 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |
+
+### Contas de usuário (adotantes)
+
+| Método | Caminho | Descrição | Respostas |
+| --- | --- | --- | --- |
+| GET | `/api/auth/config` | `{ googleClientId }` (null se o Google não estiver configurado) | 200 |
+| GET | `/api/auth/me` | `{ user }` do cookie de sessão (null se ninguém entrou) | 200 |
+| POST | `/api/auth/register` | `{ name, email, password, confirmPassword }`: cria a conta e já entra | 201, 409, 422 |
+| POST | `/api/auth/login` | `{ email, password }` | 200, 401, 422, 429 |
+| POST | `/api/auth/google` | `{ credential }`: ID token do botão do Google | 200, 401, 503 |
+| POST | `/api/auth/logout` | Encerra a sessão e apaga o cookie | 200 |
+
+- **Senha:** guardada só como hash `scrypt` (`src/lib/password.js`), com pelo menos 8 caracteres.
+- **Sessão:** cookie `adopet_session`, `HttpOnly` e `SameSite=Lax`, válido por 30 dias. O banco guarda só o SHA-256 do token (tabela `sessions`). Em produção com HTTPS, use `COOKIE_SECURE=true`.
+- **Tentativas:** depois de 5 senhas erradas para o mesmo e-mail, o login fica bloqueado por 15 minutos (429).
+- **Google:** o backend confere a assinatura do token com as chaves públicas do Google, o emissor, o `GOOGLE_CLIENT_ID`, a validade e o e-mail verificado (`src/lib/google.js`). Se já existe conta com o mesmo e-mail, a conta do Google é ligada a ela.
+
+**Configurar o "Entrar com o Google":**
+1. Em https://console.cloud.google.com, crie (ou escolha) um projeto.
+2. Em **APIs e serviços → Tela de consentimento OAuth**, configure o app (tipo "Externo") e adicione seu e-mail como usuário de teste.
+3. Em **APIs e serviços → Credenciais → Criar credenciais → ID do cliente OAuth**, escolha **Aplicativo da Web**.
+4. Em **Origens JavaScript autorizadas**, adicione `http://localhost:5173` (e o endereço do site em produção, quando houver).
+5. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`) para `GOOGLE_CLIENT_ID` no `backend/.env` e reinicie a API.
+
+O ID do cliente não é segredo (ele aparece na página); o que não pode vazar é a "chave secreta do cliente", que este projeto não usa.
 
 ### Cadastrar um animal
 

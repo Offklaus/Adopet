@@ -15,7 +15,13 @@ try {
   process.exit(1)
 }
 
-const server = createServer(createApp({ db: pool, corsOrigins: config.corsOrigins, adminApiKey: config.adminApiKey }))
+const server = createServer(createApp({
+  db: pool,
+  corsOrigins: config.corsOrigins,
+  adminApiKey: config.adminApiKey,
+  googleClientId: config.googleClientId,
+  cookieSecure: config.cookieSecure
+}))
 
 server.on('error', async (error) => {
   if (error.code === 'EADDRINUSE') {

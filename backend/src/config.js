@@ -14,6 +14,10 @@ export const config = {
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   // Chave das rotas de administração (cadastro de animais). Vazia = rotas desligadas.
   adminApiKey: process.env.ADMIN_API_KEY || undefined,
+  // Client ID do "Entrar com o Google" (Google Cloud Console). Vazio = botão desligado.
+  googleClientId: process.env.GOOGLE_CLIENT_ID || undefined,
+  // "true" em produção (HTTPS): o cookie de sessão só trafega por conexão segura.
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
   corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())

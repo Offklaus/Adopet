@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js'
 import { config } from '../src/config.js'
 import { migrate } from '../src/db/migrate.js'
 import { createPool } from '../src/db/pool.js'
+import { InvalidGoogleTokenError } from '../src/lib/google.js'
 import { seed } from './fixtures/seed.js'
 
 // Os testes usam um banco próprio (TEST_DATABASE_URL), porque apagam os dados a cada teste.
@@ -20,7 +21,19 @@ before(async () => {
   if (skip) return
   db = createPool(config.testDatabaseUrl)
   await migrate(db)
-  server = createServer(createApp({ db, corsOrigins: [ORIGIN], adminApiKey: ADMIN_KEY, log: () => {} }))
+  server = createServer(createApp({
+    db,
+    corsOrigins: [ORIGIN],
+    adminApiKey: ADMIN_KEY,
+    googleClientId: 'client-de-teste',
+    // Google falso: "google-ana" e "google-bia" são tokens válidos; o resto é inválido.
+    verifyGoogle: async (credential) => {
+      if (credential === 'google-ana') return { sub: 'g-ana', email: 'ana@exemplo.com', name: 'Ana do Google' }
+      if (credential === 'google-bia') return { sub: 'g-bia', email: 'bia@exemplo.com', name: 'Bia' }
+      throw new InvalidGoogleTokenError('teste')
+    },
+    log: () => {}
+  }))
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   baseUrl = `http://127.0.0.1:${server.address().port}`
 })
@@ -345,6 +358,115 @@ describe('listagem de pedidos de adoção (GET /api/adoptions)', { skip }, () =>
     const { status, data } = await api('/api/adoptions')
     assert.equal(status, 401)
     assert.equal(Array.isArray(data), false)
+  })
+})
+
+describe('contas de usuário (/api/auth)', { skip }, () => {
+  const newAccount = { name: 'Ana Souza', email: 'Ana@Exemplo.com', password: 'senha-forte-123', confirmPassword: 'senha-forte-123' }
+  // "adopet_session=<token>; Path=/; ..." → "adopet_session=<token>"
+  const sessionCookie = (headers) => headers.get('set-cookie')?.split(';')[0]
+
+  test('cadastro cria a conta, já entra e não devolve a senha', async () => {
+    const { status, data, headers } = await api('/api/auth/register', { method: 'POST', body: newAccount })
+    assert.equal(status, 201)
+    assert.equal(data.user.email, 'ana@exemplo.com')
+    assert.equal(data.user.hasPassword, true)
+    assert.equal('password_hash' in data.user, false)
+
+    const setCookie = headers.get('set-cookie')
+    assert.match(setCookie, /^adopet_session=[\w-]+; Path=\/; SameSite=Lax; Max-Age=2592000; HttpOnly$/)
+
+    const { data: me } = await api('/api/auth/me', { headers: { Cookie: sessionCookie(headers) } })
+    assert.equal(me.user.name, 'Ana Souza')
+
+    const { rows: [saved] } = await db.query('SELECT password_hash FROM users WHERE email = $1', ['ana@exemplo.com'])
+    assert.match(saved.password_hash, /^scrypt\$/)
+    assert.equal(saved.password_hash.includes('senha-forte-123'), false)
+  })
+
+  test('cadastro valida os campos e confere a confirmação da senha', async () => {
+    const { status, data } = await api('/api/auth/register', {
+      method: 'POST',
+      body: { name: '', email: 'x', password: '123', confirmPassword: '456' }
+    })
+    assert.equal(status, 422)
+    assert.deepEqual(Object.keys(data.errors).sort(), ['confirmPassword', 'email', 'name', 'password'])
+  })
+
+  test('e-mail já cadastrado devolve 409, sem diferenciar maiúsculas', async () => {
+    await api('/api/auth/register', { method: 'POST', body: newAccount })
+    const { status, data } = await api('/api/auth/register', { method: 'POST', body: { ...newAccount, email: 'ANA@exemplo.com' } })
+    assert.equal(status, 409)
+    assert.ok(data.errors.email)
+  })
+
+  test('login com senha certa entra; com senha errada ou e-mail inexistente, a mesma mensagem', async () => {
+    await api('/api/auth/register', { method: 'POST', body: newAccount })
+
+    const ok = await api('/api/auth/login', { method: 'POST', body: { email: 'ana@exemplo.com', password: 'senha-forte-123' } })
+    assert.equal(ok.status, 200)
+    assert.ok(sessionCookie(ok.headers))
+
+    const wrong = await api('/api/auth/login', { method: 'POST', body: { email: 'ana@exemplo.com', password: 'errada-123' } })
+    const unknown = await api('/api/auth/login', { method: 'POST', body: { email: 'ninguem@exemplo.com', password: 'errada-123' } })
+    assert.equal(wrong.status, 401)
+    assert.equal(unknown.status, 401)
+    assert.equal(wrong.data.message, unknown.data.message)
+  })
+
+  test('bloqueia o login depois de 5 senhas erradas (429)', async () => {
+    const body = { ...newAccount, email: 'bloqueio@exemplo.com' }
+    await api('/api/auth/register', { method: 'POST', body })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await api('/api/auth/login', { method: 'POST', body: { email: body.email, password: 'errada-123' } })
+    }
+    const { status } = await api('/api/auth/login', { method: 'POST', body: { email: body.email, password: body.password } })
+    assert.equal(status, 429)
+  })
+
+  test('sair apaga a sessão e o cookie', async () => {
+    const { headers } = await api('/api/auth/register', { method: 'POST', body: newAccount })
+    const cookie = sessionCookie(headers)
+
+    const logout = await api('/api/auth/logout', { method: 'POST', headers: { Cookie: cookie } })
+    assert.equal(logout.status, 200)
+    assert.match(logout.headers.get('set-cookie'), /^adopet_session=; .*Max-Age=0/)
+
+    const { data: me } = await api('/api/auth/me', { headers: { Cookie: cookie } })
+    assert.equal(me.user, null)
+  })
+
+  test('sem cookie ou com cookie inventado, ninguém está logado', async () => {
+    assert.equal((await api('/api/auth/me')).data.user, null)
+    assert.equal((await api('/api/auth/me', { headers: { Cookie: 'adopet_session=inventado' } })).data.user, null)
+  })
+
+  test('Google: cria a conta na primeira vez e reutiliza depois', async () => {
+    const first = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-bia' } })
+    assert.equal(first.status, 200)
+    assert.equal(first.data.user.hasGoogle, true)
+    assert.equal(first.data.user.hasPassword, false)
+
+    const second = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-bia' } })
+    assert.equal(second.data.user.id, first.data.user.id)
+  })
+
+  test('Google: liga à conta que já existia com o mesmo e-mail', async () => {
+    const { data: created } = await api('/api/auth/register', { method: 'POST', body: newAccount })
+    const { data } = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-ana' } })
+    assert.equal(data.user.id, created.user.id)
+    assert.equal(data.user.hasPassword, true)
+    assert.equal(data.user.hasGoogle, true)
+  })
+
+  test('Google: token inválido devolve 401', async () => {
+    const { status } = await api('/api/auth/google', { method: 'POST', body: { credential: 'falso' } })
+    assert.equal(status, 401)
+  })
+
+  test('config informa o Client ID do Google', async () => {
+    const { data } = await api('/api/auth/config')
+    assert.deepEqual(data, { googleClientId: 'client-de-teste' })
   })
 })
 
