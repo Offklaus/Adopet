@@ -21,3 +21,12 @@ export async function createPet(data, adminKey) {
     headers: { Authorization: `Bearer ${adminKey}` }
   })
 }
+
+/** Edita um animal (administração). Envia o cadastro completo, como no createPet. */
+export async function updatePet(id, data, adminKey) {
+  return request(`/pets/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: data,
+    headers: { Authorization: `Bearer ${adminKey}` }
+  })
+}

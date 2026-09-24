@@ -84,6 +84,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | GET | `/api/pets?species=cao\|gato&q=texto` | Lista pets, mais recentes primeiro; `q` busca no nome e na cidade | 200, 400 |
 | GET | `/api/pets/:id` | Um pet | 200, 404 |
 | POST | `/api/pets` | Cadastra um animal (**administração**, exige `Authorization: Bearer <ADMIN_API_KEY>`) | 201, 401, 422, 503 |
+| PUT | `/api/pets/:id` | Edita um animal (**administração**). Mesmo corpo e validação do POST; substitui o cadastro inteiro, mantendo `id` e data de cadastro | 200, 401, 404, 422, 503 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |

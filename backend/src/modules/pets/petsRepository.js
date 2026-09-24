@@ -89,6 +89,24 @@ export function createPetsRepository(db) {
       return toPet(rows[0])
     },
 
+    /** Substitui os dados do pet (o id e a data de cadastro não mudam). Devolve null se não existir. */
+    async update(id, pet) {
+      const { rows } = await db.query(
+        `UPDATE pets SET
+           name = $2, species = $3, age = $4, sex = $5, size = $6, tags = $7, status = $8,
+           photo = $9, photo_alt = $10, story = $11, street = $12, neighborhood = $13,
+           city = $14, state = $15, latitude = $16, longitude = $17
+         WHERE id = $1
+         RETURNING *`,
+        [
+          id, pet.name, pet.species, pet.age, pet.sex, pet.size, pet.tags, pet.status,
+          pet.photo, pet.photoAlt, pet.story, pet.street, pet.neighborhood, pet.city, pet.state,
+          pet.latitude, pet.longitude
+        ]
+      )
+      return toPet(rows[0])
+    },
+
     async updateStatus(id, status) {
       await db.query('UPDATE pets SET status = $1 WHERE id = $2', [status, id])
     }

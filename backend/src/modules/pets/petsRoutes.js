@@ -110,4 +110,14 @@ export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
     assertBodyIsObject(body)
     return { status: 201, body: await pets.create(parsePet(body)) }
   })
+
+  // PUT /api/pets/:id (administração): edita um animal. Mesmo corpo e validação do cadastro.
+  router.put('/api/pets/:id', async ({ req, params }) => {
+    requireAdmin(req, adminApiKey)
+    const body = await readJson(req)
+    assertBodyIsObject(body)
+    const pet = await pets.update(params.id, parsePet(body))
+    if (!pet) throw new HttpError(404, 'Pet não encontrado.')
+    return { status: 200, body: pet }
+  })
 }

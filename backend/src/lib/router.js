@@ -25,6 +25,10 @@ export class Router {
     return this.add('POST', path, handler)
   }
 
+  put(path, handler) {
+    return this.add('PUT', path, handler)
+  }
+
   /** Devolve { handler, params } ou lança 404/405. */
   match(method, pathname) {
     const allowed = []

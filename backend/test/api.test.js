@@ -213,6 +213,62 @@ describe('cadastro de pets (POST /api/pets)', { skip }, () => {
   })
 })
 
+describe('edição de pets (PUT /api/pets/:id)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const thorEditado = {
+    name: 'Thor Editado',
+    species: 'cao',
+    age: '3 anos',
+    sex: 'Macho',
+    size: 'Porte grande',
+    status: 'reserved',
+    tags: ['Vacinado'],
+    story: 'História nova.',
+    neighborhood: 'Centro',
+    city: 'Campinas',
+    state: 'SP'
+  }
+
+  test('atualiza todos os campos e mantém id e data de cadastro', async () => {
+    const { data: antes } = await api('/api/pets/thor')
+    const { status, data } = await api('/api/pets/thor', { method: 'PUT', body: thorEditado, headers: admin })
+    assert.equal(status, 200)
+    assert.equal(data.id, 'thor')
+    assert.equal(data.name, 'Thor Editado')
+    assert.equal(data.location, 'Campinas, SP')
+    assert.equal(data.status, 'reserved')
+    assert.deepEqual(data.tags, ['Vacinado'])
+    // Campos não enviados ficam vazios: a edição substitui o cadastro inteiro.
+    assert.equal(data.latitude, null)
+    assert.equal(data.createdAt, antes.createdAt)
+
+    const { data: depois } = await api('/api/pets/thor')
+    assert.equal(depois.name, 'Thor Editado')
+  })
+
+  test('pet inexistente devolve 404', async () => {
+    const { status } = await api('/api/pets/nao-existe', { method: 'PUT', body: thorEditado, headers: admin })
+    assert.equal(status, 404)
+  })
+
+  test('sem chave devolve 401 e não altera nada', async () => {
+    const { status } = await api('/api/pets/thor', { method: 'PUT', body: thorEditado })
+    assert.equal(status, 401)
+    const { data } = await api('/api/pets/thor')
+    assert.equal(data.name, 'Thor')
+  })
+
+  test('dados inválidos devolvem 422 com os erros de cada campo', async () => {
+    const { status, data } = await api('/api/pets/thor', {
+      method: 'PUT',
+      headers: admin,
+      body: { ...thorEditado, name: '', state: 'XX' }
+    })
+    assert.equal(status, 422)
+    assert.deepEqual(Object.keys(data.errors).sort(), ['name', 'state'])
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')
