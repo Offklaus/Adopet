@@ -1,12 +1,12 @@
-import { parseCookies, serializeCookie } from '../../lib/cookies.js'
+import { serializeCookie } from '../../lib/cookies.js'
 import { InvalidGoogleTokenError, verifyGoogleIdToken } from '../../lib/google.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { hashPassword, verifyPassword } from '../../lib/password.js'
 import { assertBodyIsObject, assertValid, isEmail, requiredText } from '../../lib/validate.js'
+import { readSessionToken, SESSION_COOKIE } from './session.js'
 import { createSessionsRepository } from './sessionsRepository.js'
 import { createUsersRepository, toUser } from './usersRepository.js'
 
-const SESSION_COOKIE = 'adopet_session'
 const SESSION_DAYS = 30
 const PASSWORD_MIN = 8
 const PASSWORD_MAX = 128
@@ -23,8 +23,6 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
   // Hash de uma senha qualquer: o login confere contra ele quando o e-mail não existe,
   // para a resposta demorar o mesmo e não revelar quais e-mails têm conta.
   const dummyHash = hashPassword('senha-inexistente')
-
-  const readToken = (req) => parseCookies(req.headers.cookie)[SESSION_COOKIE]
 
   async function startSession(userRow, status) {
     const token = await sessions.create(userRow.id, SESSION_DAYS)
@@ -58,7 +56,7 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
 
   // Quem está logado neste navegador ({ user: null } se ninguém).
   router.get('/api/auth/me', async ({ req }) => {
-    const token = readToken(req)
+    const token = readSessionToken(req)
     return { status: 200, body: { user: token ? await sessions.findUser(token) : null } }
   })
 
@@ -140,7 +138,7 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
   })
 
   router.post('/api/auth/logout', async ({ req }) => {
-    const token = readToken(req)
+    const token = readSessionToken(req)
     if (token) await sessions.remove(token)
     return {
       status: 200,

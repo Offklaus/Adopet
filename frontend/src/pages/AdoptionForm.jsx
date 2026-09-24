@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Button, Checkbox, Stepper, TextField } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 import { useAsync } from '../hooks/useAsync'
 import { createAdoptionRequest } from '../services/adoptionsService'
 import { getPet } from '../services/petsService'
@@ -51,6 +52,14 @@ export default function AdoptionForm() {
   const [values, setValues] = useState(INITIAL)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | sending | sent | failed
+  const { user } = useAuth()
+  const location = useLocation()
+
+  // Logado: nome e e-mail da conta já preenchidos (sem apagar o que a pessoa digitou).
+  useEffect(() => {
+    if (!user) return
+    setValues((current) => ({ ...current, name: current.name || user.name, email: current.email || user.email }))
+  }, [user])
 
   if (pet.loading) return <LoadingState />
   if (pet.error?.status === 404) return <NotFound />
@@ -102,6 +111,7 @@ export default function AdoptionForm() {
             Recebemos seu pedido para adotar {name}. A ONG vai entrar em contato por e-mail em até 3 dias úteis para agendar a visita.
           </Alert>
           <div className="row">
+            {user && <Button to="/meus-pedidos">Ver meus pedidos</Button>}
             <Button to="/adotar" variant="outline">Ver outros pets</Button>
           </div>
         </div>
@@ -115,6 +125,12 @@ export default function AdoptionForm() {
         <div className="stack">
           <h1 className="t-heading-lg">Pedido para adotar {name}</h1>
           {wantsVisit && <p className="t-muted">Depois do pedido, a ONG combina a data da visita com você.</p>}
+          {!user && (
+            <p className="t-body-sm t-muted" style={{ margin: 0 }}>
+              <Link to={`/entrar?voltar=${encodeURIComponent(location.pathname + location.search)}`}>Entre na sua conta</Link>{' '}
+              para acompanhar este pedido em Meus pedidos.
+            </p>
+          )}
         </div>
 
         <Stepper steps={STEPS} current={step} />

@@ -470,6 +470,48 @@ describe('contas de usuário (/api/auth)', { skip }, () => {
   })
 })
 
+describe('meus pedidos (GET /api/adoptions/mine)', { skip }, () => {
+  async function login(email) {
+    const { headers } = await api('/api/auth/register', {
+      method: 'POST',
+      body: { name: 'Pessoa Teste', email, password: 'senha-forte-123', confirmPassword: 'senha-forte-123' }
+    })
+    return { Cookie: headers.get('set-cookie').split(';')[0] }
+  }
+
+  test('sem estar logado devolve 401', async () => {
+    const { status } = await api('/api/adoptions/mine')
+    assert.equal(status, 401)
+  })
+
+  test('lista só os pedidos feitos pela própria conta, com o animal', async () => {
+    const ana = await login('ana@exemplo.com')
+    const bia = await login('bia@exemplo.com')
+
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' }, headers: ana })
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel' }, headers: bia })
+    // Pedido feito sem estar logado: não pertence a ninguém.
+    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'nino' } })
+
+    const { status, data } = await api('/api/adoptions/mine', { headers: ana })
+    assert.equal(status, 200)
+    assert.deepEqual(data.map((request) => request.petId), ['thor'])
+    assert.equal(data[0].petName, 'Thor')
+    assert.equal(data[0].status, 'received')
+    assert.ok('petPhoto' in data[0])
+
+    const { data: daBia } = await api('/api/adoptions/mine', { headers: bia })
+    assert.deepEqual(daBia.map((request) => request.petId), ['mel'])
+  })
+
+  test('pedido sem login continua funcionando e fica sem conta', async () => {
+    const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
+    assert.equal(status, 201)
+    const { rows: [saved] } = await db.query('SELECT user_id FROM adoption_requests WHERE id = $1', [data.id])
+    assert.equal(saved.user_id, null)
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')

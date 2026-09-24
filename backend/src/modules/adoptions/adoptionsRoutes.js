@@ -2,6 +2,7 @@ import { withTransaction } from '../../db/pool.js'
 import { requireAdmin } from '../../lib/auth.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, isEmail, isPhone, requiredText } from '../../lib/validate.js'
+import { createCurrentUser } from '../auth/session.js'
 import { createPetsRepository } from '../pets/petsRepository.js'
 import { createAdoptionsRepository } from './adoptionsRepository.js'
 
@@ -26,6 +27,15 @@ function validateAdoption(body) {
 }
 
 export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
+  const currentUser = createCurrentUser(pool)
+
+  // GET /api/adoptions/mine: pedidos da conta logada (só os dela).
+  router.get('/api/adoptions/mine', async ({ req }) => {
+    const user = await currentUser(req)
+    if (!user) throw new HttpError(401, 'Entre na sua conta para ver seus pedidos.')
+    return { status: 200, body: await createAdoptionsRepository(pool).list({ userId: user.id }) }
+  })
+
   // GET /api/adoptions?status=&petId= (administração): tem dados pessoais, exige a chave.
   router.get('/api/adoptions', async ({ req, query }) => {
     requireAdmin(req, adminApiKey)
@@ -42,6 +52,8 @@ export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
     const body = await readJson(req)
     assertBodyIsObject(body)
     validateAdoption(body)
+    // Se a pessoa está logada, o pedido fica ligado à conta dela ("Meus pedidos").
+    const user = await currentUser(req)
 
     const created = await withTransaction(pool, async (client) => {
       const pets = createPetsRepository(client)
@@ -60,7 +72,8 @@ export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
         housing: body.housing,
         hasOtherPets: body.hasOtherPets,
         message: body.message?.trim() ?? '',
-        agreeVisit: true
+        agreeVisit: true,
+        userId: user?.id ?? null
       })
       // O primeiro pedido deixa o pet "Em processo" no site.
       if (pet.status === 'available') await pets.updateStatus(pet.id, 'reserved')

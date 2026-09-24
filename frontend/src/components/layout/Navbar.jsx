@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../hooks/useTheme'
@@ -13,6 +13,57 @@ const LINKS = [
 
 function linkClass({ isActive }) {
   return cx('ap-nav__link', isActive && 'is-active')
+}
+
+/** Menu "Minha conta": nome e e-mail, Meus pedidos e Sair. Fecha com clique fora, Esc ou troca de página. */
+function AccountMenu({ user, onLogout }) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
+  const location = useLocation()
+
+  useEffect(() => setOpen(false), [location.pathname])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const closeOnOutsideClick = (event) => {
+      if (!containerRef.current?.contains(event.target)) setOpen(false)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [open])
+
+  return (
+    <div className="ap-nav__account ap-nav__cta" ref={containerRef}>
+      <button
+        type="button"
+        className="ap-btn ap-btn--ghost ap-btn--sm"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Minha conta (${user.name})`}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Icon name="user" size={18} />
+        <span className="ap-nav__account-label">Minha conta</span>
+      </button>
+      {open && (
+        <div className="ap-nav__dropdown" role="menu">
+          <p className="ap-nav__dropdown-head">
+            {user.name}
+            <span>{user.email}</span>
+          </p>
+          <Link role="menuitem" to="/meus-pedidos" className="ap-nav__dropdown-item">Meus pedidos</Link>
+          <button role="menuitem" type="button" className="ap-nav__dropdown-item" onClick={onLogout}>Sair</button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 /** Cabeçalho: marca, links principais, tema e as ações "Doar" e "Quero adotar". */
@@ -60,10 +111,7 @@ export function Navbar() {
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={20} />
           </button>
           {user ? (
-            <>
-              <span className="ap-nav__user ap-nav__cta" title={user.email}>Olá, {firstName}</span>
-              <Button variant="ghost" size="sm" onClick={logout} className="ap-nav__cta" title={`Sair da conta de ${user.name}`}>Sair</Button>
-            </>
+            <AccountMenu user={user} onLogout={logout} />
           ) : (
             <Button variant="ghost" size="sm" to={loginHref} className="ap-nav__cta">Entrar</Button>
           )}
@@ -87,7 +135,10 @@ export function Navbar() {
         <Button variant="donate" icon="heart" to="/doar" full>Doar</Button>
         <Button variant="primary" to="/adotar" full>Quero adotar</Button>
         {user ? (
-          <Button variant="outline" onClick={logout} full>Sair ({firstName})</Button>
+          <>
+            <Button variant="outline" to="/meus-pedidos" full>Meus pedidos</Button>
+            <Button variant="ghost" onClick={logout} full>Sair ({firstName})</Button>
+          </>
         ) : (
           <Button variant="outline" to={loginHref} full>Entrar ou criar conta</Button>
         )}

@@ -129,10 +129,29 @@ textarea.ap-field__control { height: auto; padding: var(--space-3) var(--space-4
 .ap-nav__icon-btn:hover { background: var(--surface-sunken); }
 .ap-nav__menu-btn { display: none; }
 .ap-nav__mobile { display: none; }
-/* Entre 1024 e 1279px a barra fica justa: menos espaço entre blocos e sem o "Olá, nome". */
+/* Menu "Minha conta" */
+.ap-nav__account { position: relative; }
+.ap-nav__dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 240px; max-width: 300px;
+  display: flex; flex-direction: column; padding: var(--space-2);
+  background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+}
+.ap-nav__dropdown-head {
+  margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3) var(--space-3);
+  display: flex; flex-direction: column; font-weight: 700; border-bottom: 1px solid var(--line);
+}
+.ap-nav__dropdown-head span { font-size: 14px; font-weight: 400; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-nav__dropdown-item {
+  font: inherit; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer;
+  padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink);
+}
+.ap-nav__dropdown-item:hover { background: var(--surface-sunken); }
+.ap-nav__dropdown-item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* Entre 1024 e 1279px a barra fica justa: menos espaço entre blocos e "Minha conta" só com o ícone. */
 @media (max-width: 1279px) {
   .ap-nav__bar { gap: var(--space-4); }
-  .ap-nav__user { display: none; }
+  .ap-nav__account-label { display: none; }
 }
 /* Navbar completa só a partir de breakpoint-lg (1024px), como no design system. */
 @media (max-width: 1023px) {

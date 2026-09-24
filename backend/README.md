@@ -93,6 +93,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
+| GET | `/api/adoptions/mine` | Pedidos da conta logada (cookie de sessão), com nome, foto e situação do animal | 200, 401 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |
 
 ### Contas de usuário (adotantes)
@@ -155,5 +156,5 @@ A resposta traz o animal cadastrado, com o `id` gerado a partir do nome (ex.: `r
 No Postman ou Insomnia: `POST http://localhost:3333/api/pets`, aba **Auth** → **Bearer Token** com a chave, corpo **JSON** com os campos acima.
 
 ### Regras de negócio
-- **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com dígitos.
+- **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com dígitos. Se a pessoa está logada, o pedido fica ligado à conta (`user_id`) e aparece em "Meus pedidos"; sem login, o pedido funciona igual e fica sem conta.
 - **Doação:** fica `pending`. O valor só deve entrar em `raised` da campanha quando o pagamento for confirmado (ainda não há integração de pagamento).

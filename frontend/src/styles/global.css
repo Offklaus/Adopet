@@ -165,10 +165,14 @@ img { max-width: 100%; }
 .auth-divider { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: 14px; color: var(--ink-muted); }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .auth-link { font: inherit; font-weight: 700; color: var(--primary); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
-.ap-nav__user {
-  font-size: 14px; font-weight: 700; color: var(--ink-muted);
-  max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* Meus pedidos (/meus-pedidos): usa os cards .request-* abaixo, com a foto do pet */
+.my-request__top { display: flex; align-items: center; gap: var(--space-4); }
+.my-request__thumb {
+  flex: none; width: 64px; height: 64px; border-radius: var(--radius-md); overflow: hidden;
+  background: var(--primary-soft); color: var(--primary-strong);
+  display: flex; align-items: center; justify-content: center;
 }
+.my-request__thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Pedidos de adoção (/admin/pedidos) */
 .admin-key-card {
