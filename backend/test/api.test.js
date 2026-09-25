@@ -26,10 +26,12 @@ before(async () => {
     corsOrigins: [ORIGIN],
     adminApiKey: ADMIN_KEY,
     googleClientId: 'client-de-teste',
+    adminEmails: ['admin@exemplo.com'],
     // Google falso: "google-ana" e "google-bia" são tokens válidos; o resto é inválido.
     verifyGoogle: async (credential) => {
       if (credential === 'google-ana') return { sub: 'g-ana', email: 'ana@exemplo.com', name: 'Ana do Google' }
       if (credential === 'google-bia') return { sub: 'g-bia', email: 'bia@exemplo.com', name: 'Bia' }
+      if (credential === 'google-admin') return { sub: 'g-admin', email: 'admin@exemplo.com', name: 'Admin' }
       throw new InvalidGoogleTokenError('teste')
     },
     log: () => {}
@@ -451,12 +453,19 @@ describe('contas de usuário (/api/auth)', { skip }, () => {
     assert.equal(second.data.user.id, first.data.user.id)
   })
 
-  test('Google: liga à conta que já existia com o mesmo e-mail', async () => {
-    const { data: created } = await api('/api/auth/register', { method: 'POST', body: newAccount })
+  test('Google: liga à conta que já existia, apaga a senha antiga e encerra as sessões dela', async () => {
+    const { data: created, headers } = await api('/api/auth/register', { method: 'POST', body: newAccount })
+    const oldCookie = sessionCookie(headers)
+
     const { data } = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-ana' } })
     assert.equal(data.user.id, created.user.id)
-    assert.equal(data.user.hasPassword, true)
+    assert.equal(data.user.hasPassword, false)
     assert.equal(data.user.hasGoogle, true)
+
+    // Quem criou a conta com senha não entra mais com ela nem com a sessão antiga.
+    const login = await api('/api/auth/login', { method: 'POST', body: { email: newAccount.email, password: newAccount.password } })
+    assert.equal(login.status, 401)
+    assert.equal((await api('/api/auth/me', { headers: { Cookie: oldCookie } })).data.user, null)
   })
 
   test('Google: token inválido devolve 401', async () => {
@@ -671,5 +680,55 @@ describe('pedidos de adoção', { skip }, () => {
       body: { ...validAdoption, message: 'a'.repeat(200_000) }
     })
     assert.equal(status, 413)
+  })
+})
+
+describe('usuário administrador', { skip }, () => {
+  const cookieOf = (headers) => ({ Cookie: headers.get('set-cookie').split(';')[0] })
+  const adminSession = async () => cookieOf((await api('/api/auth/google', { method: 'POST', body: { credential: 'google-admin' } })).headers)
+  const adopterSession = async () => cookieOf((await api('/api/auth/google', { method: 'POST', body: { credential: 'google-bia' } })).headers)
+  const newPet = { name: 'Rex', species: 'cao', age: '2 anos', sex: 'Macho', size: 'Porte médio', city: 'Campinas', state: 'SP' }
+
+  test('conta do Google com e-mail em ADMIN_EMAILS é administradora', async () => {
+    const { data } = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-admin' } })
+    assert.equal(data.user.isAdmin, true)
+    const { data: me } = await api('/api/auth/me', { headers: await adminSession() })
+    assert.equal(me.user.isAdmin, true)
+  })
+
+  test('administrador logado usa as rotas de administração sem a chave', async () => {
+    const admin = await adminSession()
+    assert.equal((await api('/api/adoptions', { headers: admin })).status, 200)
+    const created = await api('/api/pets', { method: 'POST', body: newPet, headers: admin })
+    assert.equal(created.status, 201)
+    assert.equal((await api(`/api/pets/${created.data.id}`, { method: 'PUT', body: { ...newPet, age: '3 anos' }, headers: admin })).status, 200)
+    assert.equal((await api(`/api/pets/${created.data.id}`, { method: 'DELETE', headers: admin })).status, 200)
+  })
+
+  test('adotante logado recebe 403 e não altera nada', async () => {
+    const adopter = await adopterSession()
+    const { data: me } = await api('/api/auth/me', { headers: adopter })
+    assert.equal(me.user.isAdmin, false)
+
+    const list = await api('/api/adoptions', { headers: adopter })
+    assert.equal(list.status, 403)
+    assert.equal(list.data.message, 'Esta área é só para administradores.')
+    assert.equal((await api('/api/pets', { method: 'POST', body: newPet, headers: adopter })).status, 403)
+    assert.equal((await api('/api/pets/thor', { method: 'DELETE', headers: adopter })).status, 403)
+    assert.equal((await api('/api/pets/thor')).status, 200)
+  })
+
+  test('conta só com senha usando o e-mail de administrador NÃO vira administradora', async () => {
+    const { data, headers } = await api('/api/auth/register', {
+      method: 'POST',
+      body: { name: 'Impostor', email: 'admin@exemplo.com', password: 'senha-forte-123', confirmPassword: 'senha-forte-123' }
+    })
+    assert.equal(data.user.isAdmin, false)
+    assert.equal((await api('/api/adoptions', { headers: cookieOf(headers) })).status, 403)
+  })
+
+  test('sem login: 401; a chave ADMIN_API_KEY continua valendo fora do site', async () => {
+    assert.equal((await api('/api/adoptions')).status, 401)
+    assert.equal((await api('/api/adoptions', { headers: { Authorization: `Bearer ${ADMIN_KEY}` } })).status, 200)
   })
 })
