@@ -1,8 +1,10 @@
+import { createAdminGuard } from './lib/auth.js'
 import { applyCors } from './lib/cors.js'
 import { HttpError, sendJson } from './lib/http.js'
 import { Router } from './lib/router.js'
 import { registerAdoptionsRoutes } from './modules/adoptions/adoptionsRoutes.js'
 import { registerAuthRoutes } from './modules/auth/authRoutes.js'
+import { createCurrentUser } from './modules/auth/session.js'
 import { registerCampaignsRoutes } from './modules/campaigns/campaignsRoutes.js'
 import { registerDonationsRoutes } from './modules/donations/donationsRoutes.js'
 import { registerPetsRoutes } from './modules/pets/petsRoutes.js'
@@ -15,6 +17,8 @@ export function createApp({
   db,
   corsOrigins = [],
   adminApiKey,
+  // E-mails das contas administradoras (ADMIN_EMAILS), em minúsculas.
+  adminEmails = [],
   googleClientId,
   cookieSecure = false,
   // Os testes trocam a verificação do Google por uma falsa (sem chamar o Google).
@@ -23,11 +27,15 @@ export function createApp({
 }) {
   const router = new Router()
   router.get('/api/health', () => ({ status: 200, body: { status: 'ok' } }))
-  registerPetsRoutes(router, db, { adminApiKey })
+  // Um único lugar decide quem está logado e quem é administrador; todas as rotas usam estes dois.
+  const currentUser = createCurrentUser(db, { adminEmails })
+  const requireAdmin = createAdminGuard({ adminApiKey, currentUser })
+
+  registerPetsRoutes(router, db, { requireAdmin })
   registerCampaignsRoutes(router, db)
   registerDonationsRoutes(router, db)
-  registerAdoptionsRoutes(router, db, { adminApiKey })
-  registerAuthRoutes(router, db, { googleClientId, cookieSecure, ...(verifyGoogle && { verifyGoogle }) })
+  registerAdoptionsRoutes(router, db, { currentUser, requireAdmin })
+  registerAuthRoutes(router, db, { googleClientId, cookieSecure, adminEmails, ...(verifyGoogle && { verifyGoogle }) })
 
   return async function handleRequest(req, res) {
     const startedAt = performance.now()

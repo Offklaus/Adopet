@@ -1,5 +1,6 @@
 import { lazy } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { RequireAdmin } from './components/admin/RequireAdmin'
 import { Layout } from './components/layout/Layout'
 import Home from './pages/Home'
 
@@ -27,10 +28,14 @@ export default function App() {
         <Route path="doar" element={<Donate />} />
         <Route path="entrar" element={<Login />} />
         <Route path="meus-pedidos" element={<MyAdoptions />} />
-        <Route path="admin/animais" element={<AdminPets />} />
-        <Route path="admin/animais/novo" element={<PetRegister />} />
-        <Route path="admin/animais/:id/editar" element={<PetEdit />} />
-        <Route path="admin/pedidos" element={<AdminAdoptions />} />
+        {/* Área administrativa: só para o administrador logado (ver RequireAdmin). */}
+        <Route path="admin" element={<RequireAdmin />}>
+          <Route index element={<Navigate to="animais" replace />} />
+          <Route path="animais" element={<AdminPets />} />
+          <Route path="animais/novo" element={<PetRegister />} />
+          <Route path="animais/:id/editar" element={<PetEdit />} />
+          <Route path="pedidos" element={<AdminAdoptions />} />
+        </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

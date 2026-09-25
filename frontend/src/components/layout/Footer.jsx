@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { Icon } from '../ui'
 
 export function Footer() {
+  const { user } = useAuth()
   return (
     <footer className="footer">
       <div className="container">
@@ -20,7 +22,7 @@ export function Footer() {
               <li><Link to="/adotar">Adotar</Link></li>
               <li><Link to="/#como-funciona">Como funciona</Link></li>
               <li><Link to="/doar">Doar</Link></li>
-              <li><Link to="/admin/animais">Área administrativa</Link></li>
+              {user?.isAdmin && <li><Link to="/admin">Área administrativa</Link></li>}
             </ul>
           </nav>
         </div>

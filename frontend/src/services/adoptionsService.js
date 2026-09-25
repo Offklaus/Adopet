@@ -12,12 +12,8 @@ export async function createAdoptionRequest(data) {
  * Aprova ou recusa um pedido (administração). status: 'approved' | 'rejected'.
  * Resposta: { request, pet: { id, name, status }, autoRejected }.
  */
-export async function decideAdoptionRequest(id, status, adminKey) {
-  return request(`/adoptions/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: { status },
-    headers: { Authorization: `Bearer ${adminKey}` }
-  })
+export async function decideAdoptionRequest(id, status) {
+  return request(`/adoptions/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status } })
 }
 
 /** Pedidos da conta logada (a sessão vai no cookie). 401 se ninguém entrou. */
@@ -25,7 +21,7 @@ export async function listMyAdoptionRequests() {
   return request('/adoptions/mine')
 }
 
-/** Lista os pedidos de adoção (administração: têm dados pessoais e exigem a ADMIN_API_KEY). */
-export async function listAdoptionRequests(adminKey) {
-  return request('/adoptions', { headers: { Authorization: `Bearer ${adminKey}` } })
+/** Lista os pedidos de adoção (administração: têm dados pessoais; só para o administrador logado). */
+export async function listAdoptionRequests() {
+  return request('/adoptions')
 }

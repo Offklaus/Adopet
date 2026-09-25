@@ -1,8 +1,6 @@
 import { withTransaction } from '../../db/pool.js'
-import { requireAdmin } from '../../lib/auth.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, isEmail, isPhone, requiredText } from '../../lib/validate.js'
-import { createCurrentUser } from '../auth/session.js'
 import { createPetsRepository } from '../pets/petsRepository.js'
 import { createAdoptionsRepository } from './adoptionsRepository.js'
 
@@ -28,9 +26,11 @@ function validateAdoption(body) {
   assertValid(errors)
 }
 
-export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
-  const currentUser = createCurrentUser(pool)
-
+/**
+ * `currentUser(req)` e `requireAdmin(req)` vêm do app.js, os mesmos usados pelas outras rotas:
+ * um único lugar decide quem está logado e quem é administrador.
+ */
+export function registerAdoptionsRoutes(router, pool, { currentUser, requireAdmin }) {
   // GET /api/adoptions/mine: pedidos da conta logada (só os dela).
   router.get('/api/adoptions/mine', async ({ req }) => {
     const user = await currentUser(req)
@@ -40,7 +40,7 @@ export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
 
   // GET /api/adoptions?status=&petId= (administração): tem dados pessoais, exige a chave.
   router.get('/api/adoptions', async ({ req, query }) => {
-    requireAdmin(req, adminApiKey)
+    await requireAdmin(req)
     const status = query.get('status') || undefined
     const petId = query.get('petId') || undefined
     if (status && !STATUSES.includes(status)) {
@@ -89,7 +89,7 @@ export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
   // Aprovar: pet vira "adopted" e os outros pedidos em aberto dele são recusados.
   // Recusar: se não sobrar pedido em aberto, o pet volta a "available".
   router.patch('/api/adoptions/:id', async ({ req, params }) => {
-    requireAdmin(req, adminApiKey)
+    await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
     if (!DECISIONS.includes(body.status)) {

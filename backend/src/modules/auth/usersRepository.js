@@ -35,8 +35,13 @@ export function createUsersRepository(db) {
     },
 
     /** Liga a conta do Google a uma conta que já existia com o mesmo e-mail. */
+    // A senha antiga é apagada: o e-mail dela nunca foi confirmado, e quem criou a conta
+    // antes poderia ser outra pessoa usando este e-mail. A partir daqui, vale o login do Google.
     async linkGoogle(id, sub) {
-      const { rows } = await db.query('UPDATE users SET google_sub = $2 WHERE id = $1 RETURNING *', [id, sub])
+      const { rows } = await db.query(
+        'UPDATE users SET google_sub = $2, password_hash = NULL WHERE id = $1 RETURNING *',
+        [id, sub]
+      )
       return rows[0]
     }
   }

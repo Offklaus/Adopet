@@ -3,7 +3,7 @@ import { InvalidGoogleTokenError, verifyGoogleIdToken } from '../../lib/google.j
 import { HttpError, readJson } from '../../lib/http.js'
 import { hashPassword, verifyPassword } from '../../lib/password.js'
 import { assertBodyIsObject, assertValid, isEmail, requiredText } from '../../lib/validate.js'
-import { readSessionToken, SESSION_COOKIE } from './session.js'
+import { readSessionToken, SESSION_COOKIE, withRole } from './session.js'
 import { createSessionsRepository } from './sessionsRepository.js'
 import { createUsersRepository, toUser } from './usersRepository.js'
 
@@ -16,7 +16,11 @@ const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000
 
 const normalizeEmail = (email) => email.trim().toLowerCase()
 
-export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure = false, verifyGoogle = verifyGoogleIdToken } = {}) {
+export function registerAuthRoutes(
+  router,
+  pool,
+  { googleClientId, cookieSecure = false, adminEmails = [], verifyGoogle = verifyGoogleIdToken } = {}
+) {
   const users = createUsersRepository(pool)
   const sessions = createSessionsRepository(pool)
   const failedLogins = new Map()
@@ -28,7 +32,7 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
     const token = await sessions.create(userRow.id, SESSION_DAYS)
     return {
       status,
-      body: { user: toUser(userRow) },
+      body: { user: withRole(toUser(userRow), adminEmails) },
       headers: {
         'Set-Cookie': serializeCookie(SESSION_COOKIE, token, { maxAge: SESSION_DAYS * 24 * 60 * 60, secure: cookieSecure })
       }
@@ -57,7 +61,7 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
   // Quem está logado neste navegador ({ user: null } se ninguém).
   router.get('/api/auth/me', async ({ req }) => {
     const token = readSessionToken(req)
-    return { status: 200, body: { user: token ? await sessions.findUser(token) : null } }
+    return { status: 200, body: { user: token ? withRole(await sessions.findUser(token), adminEmails) : null } }
   })
 
   // POST /api/auth/register  { name, email, password, confirmPassword }
@@ -130,9 +134,13 @@ export function registerAuthRoutes(router, pool, { googleClientId, cookieSecure 
     if (!row) {
       const existing = await users.findRowByEmail(profile.email)
       // O Google confirmou que o e-mail é da pessoa: liga à conta que já existia.
-      row = existing
-        ? await users.linkGoogle(existing.id, profile.sub)
-        : await users.create({ name: profile.name, email: profile.email, googleSub: profile.sub })
+      if (existing) {
+        // Encerra as sessões abertas com a senha antiga antes de ligar o Google (ver linkGoogle).
+        await sessions.removeAllForUser(existing.id)
+        row = await users.linkGoogle(existing.id, profile.sub)
+      } else {
+        row = await users.create({ name: profile.name, email: profile.email, googleSub: profile.sub })
+      }
     }
     return startSession(row, 200)
   })

@@ -14,6 +14,11 @@ export const config = {
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   // Chave das rotas de administração (cadastro de animais). Vazia = rotas desligadas.
   adminApiKey: process.env.ADMIN_API_KEY || undefined,
+  // Contas administradoras: e-mails separados por vírgula. Só valem para contas ligadas ao Google.
+  adminEmails: (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
   // Client ID do "Entrar com o Google" (Google Cloud Console). Vazio = botão desligado.
   googleClientId: process.env.GOOGLE_CLIENT_ID || undefined,
   // "true" em produção (HTTPS): o cookie de sessão só trafega por conexão segura.

@@ -59,6 +59,9 @@ function AccountMenu({ user, onLogout }) {
             <span>{user.email}</span>
           </p>
           <Link role="menuitem" to="/meus-pedidos" className="ap-nav__dropdown-item">Meus pedidos</Link>
+          {user.isAdmin && (
+            <Link role="menuitem" to="/admin" className="ap-nav__dropdown-item">Área administrativa</Link>
+          )}
           <button role="menuitem" type="button" className="ap-nav__dropdown-item" onClick={onLogout}>Sair</button>
         </div>
       )}
@@ -137,6 +140,7 @@ export function Navbar() {
         {user ? (
           <>
             <Button variant="outline" to="/meus-pedidos" full>Meus pedidos</Button>
+            {user.isAdmin && <Button variant="outline" to="/admin" full>Área administrativa</Button>}
             <Button variant="ghost" onClick={logout} full>Sair ({firstName})</Button>
           </>
         ) : (

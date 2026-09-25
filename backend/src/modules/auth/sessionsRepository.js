@@ -29,6 +29,11 @@ export function createSessionsRepository(db) {
 
     async remove(token) {
       await db.query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)])
+    },
+
+    /** Encerra todas as sessões de um usuário (em todos os navegadores). */
+    async removeAllForUser(userId) {
+      await db.query('DELETE FROM sessions WHERE user_id = $1', [userId])
     }
   }
 }

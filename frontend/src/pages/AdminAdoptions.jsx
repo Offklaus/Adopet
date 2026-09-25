@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AdminKeyField } from '../components/admin/AdminKeyField'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
-import { useAdminKey } from '../hooks/useAdminKey'
 import { decideAdoptionRequest, listAdoptionRequests } from '../services/adoptionsService'
 
 const STATUS = {
@@ -115,37 +113,31 @@ function RequestCard({ request, otherOpen, onDecide }) {
   )
 }
 
-/** Pedidos de adoção (administração). Os dados pessoais só são carregados com a chave. */
+/** 401 = sessão terminou; 403 = conta sem permissão de administrador. */
+function sessionProblem(err) {
+  if (err.status === 401) return { title: 'Sua sessão terminou', text: 'Entre de novo com a conta de administrador.' }
+  if (err.status === 403) return { title: 'Acesso restrito', text: 'Esta área é só para administradores.' }
+  return null
+}
+
+/** Pedidos de adoção (administração). Só o administrador logado chega aqui (RequireAdmin). */
 export default function AdminAdoptions() {
-  const { adminKey, setAdminKey, remember, setRemember, persist } = useAdminKey()
   const [requests, setRequests] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [keyError, setKeyError] = useState()
   const [statusFilter, setStatusFilter] = useState('')
   const [query, setQuery] = useState('')
   // Resultado da última decisão (aprovar/recusar).
   const [notice, setNotice] = useState(null)
 
-  async function load(key) {
-    if (!key.trim()) {
-      setKeyError('Informe a chave de administrador.')
-      return
-    }
+  async function load() {
     setLoading(true)
     setError(null)
-    setKeyError(undefined)
     try {
-      setRequests(await listAdoptionRequests(key.trim()))
-      persist()
+      setRequests(await listAdoptionRequests())
     } catch (err) {
       setRequests(null)
-      if (err.status === 401) {
-        setKeyError('Chave de administrador inválida.')
-        setError({ title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
-      } else {
-        setError({ title: 'Não foi possível carregar os pedidos', text: err.message })
-      }
+      setError(sessionProblem(err) ?? { title: 'Não foi possível carregar os pedidos', text: err.message })
     } finally {
       setLoading(false)
     }
@@ -155,7 +147,7 @@ export default function AdminAdoptions() {
   async function handleDecide(request, status) {
     setNotice(null)
     try {
-      const result = await decideAdoptionRequest(request.id, status, adminKey.trim())
+      const result = await decideAdoptionRequest(request.id, status)
       const details = []
       if (result.autoRejected > 0) {
         details.push(`${result.autoRejected} outro(s) pedido(s) para ${result.pet.name} foram recusados.`)
@@ -170,16 +162,15 @@ export default function AdminAdoptions() {
           : `Pedido de ${request.name} recusado`,
         text: details.join(' ')
       })
-      await load(adminKey)
+      await load()
       return true
     } catch (err) {
-      if (err.status === 401) {
-        setKeyError('Chave de administrador inválida.')
-        setNotice({ tone: 'danger', title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
+      if (sessionProblem(err)) {
+        setNotice({ tone: 'danger', ...sessionProblem(err) })
       } else if (err.status === 409) {
         // Alguém já decidiu este pedido: mostra a situação atual.
         setNotice({ tone: 'warning', title: err.message, text: 'A lista foi atualizada.' })
-        await load(adminKey)
+        await load()
       } else {
         setNotice({ tone: 'danger', title: 'Não foi possível salvar a decisão', text: err.message })
       }
@@ -189,10 +180,8 @@ export default function AdminAdoptions() {
     }
   }
 
-  // Com a chave lembrada nesta aba, a lista abre direto.
   useEffect(() => {
-    if (adminKey) load(adminKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load()
   }, [])
 
   const counts = useMemo(() => {
@@ -229,7 +218,7 @@ export default function AdminAdoptions() {
           </div>
           <div className="row">
             {requests && (
-              <Button variant="ghost" onClick={() => load(adminKey)} disabled={loading}>Atualizar</Button>
+              <Button variant="ghost" onClick={() => load()} disabled={loading}>Atualizar</Button>
             )}
             <Button variant="outline" to="/admin/animais">Animais cadastrados</Button>
           </div>
@@ -237,30 +226,6 @@ export default function AdminAdoptions() {
 
         {error && <Alert tone="danger" title={error.title}>{error.text}</Alert>}
         {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text || null}</Alert>}
-
-        {!requests && (
-          <form
-            className="admin-key-card"
-            onSubmit={(event) => {
-              event.preventDefault()
-              load(adminKey)
-            }}
-          >
-            <p className="t-muted" style={{ margin: 0 }}>
-              Os pedidos têm nome, e-mail e telefone de quem quer adotar. Informe a chave para ver.
-            </p>
-            <AdminKeyField
-              adminKey={adminKey}
-              setAdminKey={setAdminKey}
-              remember={remember}
-              setRemember={setRemember}
-              error={keyError}
-            />
-            <div>
-              <Button type="submit" disabled={loading}>{loading ? 'Carregando…' : 'Ver pedidos'}</Button>
-            </div>
-          </form>
-        )}
 
         {loading && !requests && <LoadingState label="Buscando pedidos…" />}
 

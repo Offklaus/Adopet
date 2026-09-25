@@ -19,6 +19,7 @@ const server = createServer(createApp({
   db: pool,
   corsOrigins: config.corsOrigins,
   adminApiKey: config.adminApiKey,
+  adminEmails: config.adminEmails,
   googleClientId: config.googleClientId,
   cookieSecure: config.cookieSecure
 }))

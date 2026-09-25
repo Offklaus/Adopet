@@ -175,11 +175,6 @@ img { max-width: 100%; }
 .my-request__thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Pedidos de adoção (/admin/pedidos) */
-.admin-key-card {
-  max-width: 520px; display: flex; flex-direction: column; gap: var(--space-4);
-  padding: var(--space-6); background: var(--surface-raised);
-  border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
-}
 .request-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
 .request-card {
   display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6);

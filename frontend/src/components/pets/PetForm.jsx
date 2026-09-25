@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAdminKey } from '../../hooks/useAdminKey'
-import { AdminKeyField } from '../admin/AdminKeyField'
 import { Alert, Button, Chip, TextField } from '../ui'
 
 const MAX_TAGS = 5
@@ -164,9 +162,20 @@ function toPayload(values) {
   }
 }
 
+/** 401 = sessão terminou; 403 = conta sem permissão de administrador. */
+function sessionProblem(error) {
+  if (error.status === 401) {
+    return { tone: 'danger', title: 'Sua sessão terminou', text: 'Entre de novo com a conta de administrador.' }
+  }
+  if (error.status === 403) {
+    return { tone: 'danger', title: 'Acesso restrito', text: 'Esta área é só para administradores.' }
+  }
+  return null
+}
+
 /**
  * Formulário de animal usado no cadastro e na edição.
- * `onSubmit(payload, adminKey)` chama a API e devolve o pet salvo.
+ * `onSubmit(payload)` chama a API (com a sessão do administrador) e devolve o pet salvo.
  */
 export function PetForm({
   title,
@@ -179,7 +188,7 @@ export function PetForm({
   successText,
   clearAfterSuccess = false,
   backTo,
-  // Opcional: com ele aparece a seção "Excluir animal". Recebe a chave de administrador.
+  // Opcional: com ele aparece a seção "Excluir animal".
   onDelete
 }) {
   const [baseline, setBaseline] = useState(() => (initialPet ? petToValues(initialPet) : EMPTY_PET))
@@ -190,7 +199,6 @@ export function PetForm({
   const [photoBroken, setPhotoBroken] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const { adminKey, setAdminKey, remember, setRemember, persist } = useAdminKey()
 
   const tagCount = values.tags.length + values.extraTags.length
 
@@ -230,26 +238,23 @@ export function PetForm({
     setFeedback(null)
 
     const found = validate(values)
-    if (!adminKey.trim()) found.adminKey = 'Informe a chave de administrador.'
     setErrors(found)
     if (Object.keys(found).length > 0) {
       showFeedback({ tone: 'danger', title: 'Confira os campos destacados.' })
       return
     }
 
-    persist()
     setSending(true)
     try {
-      const pet = await onSubmit(toPayload(values), adminKey.trim())
+      const pet = await onSubmit(toPayload(values))
       const saved = clearAfterSuccess ? EMPTY_PET : petToValues(pet)
       setBaseline(saved)
       setValues(saved)
       setErrors({})
       showFeedback({ tone: 'success', title: successTitle(pet), text: successText, pet })
     } catch (error) {
-      if (error.status === 401) {
-        setErrors({ adminKey: 'Chave de administrador inválida.' })
-        showFeedback({ tone: 'danger', title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
+      if (sessionProblem(error)) {
+        showFeedback(sessionProblem(error))
       } else if (error.status === 422) {
         setErrors(error.details?.errors ?? {})
         showFeedback({ tone: 'danger', title: error.message })
@@ -262,23 +267,15 @@ export function PetForm({
   }
 
   async function handleDelete() {
-    if (!adminKey.trim()) {
-      setErrors({ adminKey: 'Informe a chave de administrador.' })
-      setConfirmingDelete(false)
-      showFeedback({ tone: 'danger', title: 'Informe a chave de administrador para excluir.' })
-      return
-    }
-    persist()
     setDeleting(true)
     try {
       // Em caso de sucesso a página sai daqui (volta para a lista).
-      await onDelete(adminKey.trim())
+      await onDelete()
     } catch (error) {
       setDeleting(false)
       setConfirmingDelete(false)
-      if (error.status === 401) {
-        setErrors({ adminKey: 'Chave de administrador inválida.' })
-        showFeedback({ tone: 'danger', title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
+      if (sessionProblem(error)) {
+        showFeedback(sessionProblem(error))
       } else if (error.status === 409) {
         showFeedback({ tone: 'warning', title: 'Não é possível excluir', text: error.message })
       } else {
@@ -314,17 +311,6 @@ export function PetForm({
             )}
           </Alert>
         )}
-
-        <fieldset className="form-section">
-          <legend className="t-heading-sm">Acesso</legend>
-          <AdminKeyField
-            adminKey={adminKey}
-            setAdminKey={setAdminKey}
-            remember={remember}
-            setRemember={setRemember}
-            error={errors.adminKey}
-          />
-        </fieldset>
 
         <fieldset className="form-section">
           <legend className="t-heading-sm">Sobre o animal</legend>

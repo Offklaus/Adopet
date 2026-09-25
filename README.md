@@ -66,10 +66,10 @@ frontend/src/
 | `/doar` | Campanhas e doação livre |
 | `/meus-pedidos` | Pedidos de adoção da conta logada, com a situação de cada um (link no menu "Minha conta") |
 | `/entrar` | Entrar ou criar conta (e-mail e senha, ou conta do Google). `?modo=cadastro` abre em "Criar conta"; `?voltar=/caminho` volta para a página depois de entrar |
-| `/admin/animais` | Área administrativa: lista dos animais cadastrados (link "Área administrativa" no rodapé) |
-| `/admin/animais/novo` | Cadastro de animal (pede a `ADMIN_API_KEY` do backend) |
-| `/admin/animais/:id/editar` | Edição e exclusão de um animal (pede a `ADMIN_API_KEY` do backend) |
-| `/admin/pedidos` | Pedidos de adoção com os dados de contato; aprovar ou recusar cada pedido recebido (pede a `ADMIN_API_KEY` do backend) |
+| `/admin`, `/admin/animais` | Área administrativa, **só para o administrador logado** (e-mail em `ADMIN_EMAILS` no backend, conta do Google). Link no menu "Minha conta" e no rodapé, visível só para ele |
+| `/admin/animais/novo` | Cadastro de animal (só administrador) |
+| `/admin/animais/:id/editar` | Edição e exclusão de um animal (só administrador) |
+| `/admin/pedidos` | Pedidos de adoção com os dados de contato; aprovar ou recusar cada pedido recebido (só administrador) |
 
 ### Integração com o backend
 

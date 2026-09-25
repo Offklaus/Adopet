@@ -22,11 +22,12 @@ Requer **Node 20.12 ou mais novo** e **PostgreSQL 13 ou mais novo**.
    npm install
    npm run db:create
    ```
-3. Gere a chave de administrador e coloque em `ADMIN_API_KEY` no `.env` (é ela que libera o cadastro de animais):
+3. Defina quem é administrador: em `ADMIN_EMAILS` no `.env`, coloque o e-mail da conta do Google que vai administrar o site (vários: separados por vírgula). Configure também o `GOOGLE_CLIENT_ID` (seção "Contas de usuário").
+   Opcional: gere uma `ADMIN_API_KEY` para usar as rotas de administração fora do site (Postman, scripts):
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
-4. Suba a API. Na primeira execução ela cria as tabelas (migrações). O banco começa vazio: cadastre os animais pelo `POST /api/pets` (veja abaixo).
+4. Suba a API. Na primeira execução ela cria as tabelas (migrações). O banco começa vazio: entre no site com a conta de administrador e cadastre os animais em **Minha conta → Área administrativa**.
    ```bash
    npm run dev
    ```
@@ -87,7 +88,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | GET | `/api/health` | Verifica se a API está no ar | 200 |
 | GET | `/api/pets?species=cao\|gato&q=texto` | Lista pets, mais recentes primeiro; `q` busca no nome e na cidade | 200, 400 |
 | GET | `/api/pets/:id` | Um pet | 200, 404 |
-| POST | `/api/pets` | Cadastra um animal (**administração**, exige `Authorization: Bearer <ADMIN_API_KEY>`) | 201, 401, 422, 503 |
+| POST | `/api/pets` | Cadastra um animal (**administração**) | 201, 401, 403, 422 |
 | PUT | `/api/pets/:id` | Edita um animal (**administração**). Mesmo corpo e validação do POST; substitui o cadastro inteiro, mantendo `id` e data de cadastro | 200, 401, 404, 422, 503 |
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
@@ -96,6 +97,16 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | PATCH | `/api/adoptions/:id` | `{ status: "approved" \| "rejected" }`: aprova ou recusa um pedido recebido (**administração**). Responde `{ request, pet, autoRejected }` | 200, 401, 404, 409, 422 |
 | GET | `/api/adoptions/mine` | Pedidos da conta logada (cookie de sessão), com nome, foto e situação do animal | 200, 401 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }` | 201, 404, 409, 422 |
+
+### Administrador
+
+As rotas marcadas como **administração** (cadastrar, editar e excluir animais; ver, aprovar e recusar pedidos) só respondem para:
+- **o administrador logado no site:** conta ligada ao Google cujo e-mail está em `ADMIN_EMAILS`; ou
+- **quem envia a chave** `Authorization: Bearer <ADMIN_API_KEY>`, para uso fora do site.
+
+Sem login: **401**. Logado sem ser administrador: **403**. A regra fica em `src/lib/auth.js` (`createAdminGuard`) e `src/modules/auth/session.js` (`withRole`), e o `GET /api/auth/me` devolve `isAdmin`.
+
+Por que só contas do Google: contas com senha não confirmam o e-mail, então alguém poderia criar uma conta com senha usando o e-mail do administrador. Pelo mesmo motivo, quando o Google é ligado a uma conta que já tinha senha, a senha e as sessões antigas são apagadas.
 
 ### Contas de usuário (adotantes)
 

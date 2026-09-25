@@ -1,4 +1,3 @@
-import { requireAdmin } from '../../lib/auth.js'
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, requiredText } from '../../lib/validate.js'
 import { createPetsRepository } from './petsRepository.js'
@@ -84,7 +83,8 @@ function parsePet(body) {
   }
 }
 
-export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
+/** `requireAdmin(req)` vem do app.js (createAdminGuard): administrador logado ou ADMIN_API_KEY. */
+export function registerPetsRoutes(router, db, { requireAdmin }) {
   const pets = createPetsRepository(db)
 
   // GET /api/pets?species=cao|gato&q=texto
@@ -105,7 +105,7 @@ export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
 
   // POST /api/pets (administração): cadastra um animal. Exige Authorization: Bearer <ADMIN_API_KEY>.
   router.post('/api/pets', async ({ req }) => {
-    requireAdmin(req, adminApiKey)
+    await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
     return { status: 201, body: await pets.create(parsePet(body)) }
@@ -113,7 +113,7 @@ export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
 
   // PUT /api/pets/:id (administração): edita um animal. Mesmo corpo e validação do cadastro.
   router.put('/api/pets/:id', async ({ req, params }) => {
-    requireAdmin(req, adminApiKey)
+    await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
     const pet = await pets.update(params.id, parsePet(body))
@@ -123,7 +123,7 @@ export function registerPetsRoutes(router, db, { adminApiKey } = {}) {
 
   // DELETE /api/pets/:id (administração): exclui um animal sem pedidos de adoção.
   router.delete('/api/pets/:id', async ({ req, params }) => {
-    requireAdmin(req, adminApiKey)
+    await requireAdmin(req)
     const pet = await pets.findById(params.id)
     if (!pet) throw new HttpError(404, 'Pet não encontrado.')
 

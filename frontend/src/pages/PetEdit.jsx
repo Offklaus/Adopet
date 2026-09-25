@@ -31,10 +31,10 @@ export default function PetEdit() {
       submitLabel="Salvar alterações"
       sendingLabel="Salvando…"
       resetLabel="Desfazer alterações"
-      onSubmit={(payload, adminKey) => updatePet(id, payload, adminKey)}
+      onSubmit={(payload) => updatePet(id, payload)}
       successTitle={() => 'Alterações salvas'}
-      onDelete={async (adminKey) => {
-        await deletePet(id, adminKey)
+      onDelete={async () => {
+        await deletePet(id)
         navigate('/admin/animais', { state: { deletedName: pet.data.name } })
       }}
     />
