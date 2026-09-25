@@ -17,6 +17,14 @@ export async function markDonationPaid(id) {
   return request(`/donations/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status: 'paid' } })
 }
 
+/**
+ * Cancela uma doação pendente ou paga (administração). Se já estava paga, o valor sai da meta.
+ * Resposta: { donation: { ..., previousStatus }, campaign | null }.
+ */
+export async function cancelDonation(id) {
+  return request(`/donations/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status: 'canceled' } })
+}
+
 /** Registra a intenção de doar; o pagamento (Pix, cartão) ainda não está integrado. */
 export async function createDonation({ campaignId, amount }) {
   return request('/donations', { method: 'POST', body: { campaignId, amount } })

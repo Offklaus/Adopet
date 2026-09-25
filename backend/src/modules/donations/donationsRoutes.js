@@ -7,6 +7,8 @@ import { createDonationsRepository } from './donationsRepository.js'
 const MIN_AMOUNT = 1
 const MAX_AMOUNT = 100_000
 const STATUSES = ['pending', 'paid', 'canceled']
+// Mudanças que o administrador pode pedir no PATCH.
+const DECISIONS = ['paid', 'canceled']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** `requireAdmin(req)` vem do app.js: a lista de doações é só para o administrador. */
@@ -47,28 +49,38 @@ export function registerDonationsRoutes(router, db, { requireAdmin }) {
     return { status: 201, body: await donations.create({ campaignId, amount: body.amount }) }
   })
 
-  // PATCH /api/donations/:id  { status: 'paid' } (administração): confirma o pagamento.
-  // Só doações pendentes; o valor entra na meta da campanha (raised) e conta um apoiador.
+  // PATCH /api/donations/:id  { status: 'paid' | 'canceled' } (administração)
+  // - paid:     só de pendente; o valor entra na meta da campanha (raised) e conta um apoiador.
+  // - canceled: de pendente (nada muda na meta) ou de paga (estorno: o valor sai da meta).
+  // Cancelada é definitivo.
   router.patch('/api/donations/:id', async ({ req, params }) => {
     await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
-    if (body.status !== 'paid') assertValid({ status: 'Use "paid" para marcar a doação como paga.' })
+    if (!DECISIONS.includes(body.status)) {
+      assertValid({ status: 'Use "paid" para marcar como paga ou "canceled" para cancelar.' })
+    }
     if (!UUID.test(params.id)) throw new HttpError(404, 'Doação não encontrada.')
 
     const result = await withTransaction(db, async (client) => {
       const donationsTx = createDonationsRepository(client)
+      const campaignsTx = createCampaignsRepository(client)
       const donation = await donationsTx.findByIdForUpdate(params.id)
       if (!donation) throw new HttpError(404, 'Doação não encontrada.')
-      if (donation.status !== 'pending') {
-        throw new HttpError(409, `Esta doação já está ${donation.status === 'paid' ? 'paga' : 'cancelada'}.`)
+      if (donation.status === 'canceled') throw new HttpError(409, 'Esta doação já está cancelada.')
+      if (body.status === 'paid' && donation.status === 'paid') throw new HttpError(409, 'Esta doação já está paga.')
+
+      const wasPaid = donation.status === 'paid'
+      await donationsTx.setStatus(donation.id, body.status)
+
+      let campaign = null
+      if (donation.campaign_id && body.status === 'paid') {
+        campaign = await campaignsTx.addDonation(donation.campaign_id, donation.amount)
+      } else if (donation.campaign_id && wasPaid) {
+        campaign = await campaignsTx.removeDonation(donation.campaign_id, donation.amount)
       }
-      await donationsTx.markPaid(donation.id)
-      const campaign = donation.campaign_id
-        ? await createCampaignsRepository(client).addDonation(donation.campaign_id, donation.amount)
-        : null
       return {
-        donation: { id: donation.id, status: 'paid', amount: donation.amount },
+        donation: { id: donation.id, status: body.status, amount: donation.amount, previousStatus: donation.status },
         campaign: campaign && { id: campaign.id, title: campaign.title, raised: campaign.raised, goal: campaign.goal, supporters: campaign.supporters }
       }
     })

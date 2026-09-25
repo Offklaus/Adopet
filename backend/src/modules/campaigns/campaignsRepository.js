@@ -31,6 +31,17 @@ export function createCampaignsRepository(db) {
       return toCampaign(rows[0])
     },
 
+    /** Tira da meta uma doação paga que foi cancelada (estorno). Nunca deixa os totais negativos. */
+    async removeDonation(id, amount) {
+      const { rows } = await db.query(
+        `UPDATE campaigns SET raised = GREATEST(raised - $2, 0), supporters = GREATEST(supporters - 1, 0)
+         WHERE id = $1
+         RETURNING *`,
+        [id, amount]
+      )
+      return toCampaign(rows[0])
+    },
+
     async findActiveById(id) {
       const { rows } = await db.query('SELECT * FROM campaigns WHERE id = $1 AND active', [id])
       return toCampaign(rows[0])

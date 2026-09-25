@@ -41,8 +41,9 @@ export function createDonationsRepository(db) {
       return rows[0] ?? null
     },
 
-    async markPaid(id) {
-      await db.query(`UPDATE donations SET status = 'paid' WHERE id = $1`, [id])
+    /** status: 'paid' | 'canceled' (a rota confere quais mudanças são permitidas). */
+    async setStatus(id, status) {
+      await db.query('UPDATE donations SET status = $2 WHERE id = $1', [id, status])
     },
 
     /** Registra a doação como 'pending'; o valor só entra na meta quando o pagamento for confirmado. */

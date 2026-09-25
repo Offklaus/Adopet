@@ -4,7 +4,7 @@ import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
 import { useAsync } from '../hooks/useAsync'
-import { listDonations, markDonationPaid } from '../services/campaignsService'
+import { cancelDonation, listDonations, markDonationPaid } from '../services/campaignsService'
 import { formatBRL } from '../utils/formatBRL'
 
 const STATUS = {
@@ -23,39 +23,60 @@ const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeSt
 
 const sumAmount = (list) => list.reduce((total, donation) => total + donation.amount, 0)
 
-/** Botão "Marcar como paga" de uma doação pendente, com confirmação na própria linha. */
-function MarkPaidCell({ donation, onConfirm }) {
-  const [confirming, setConfirming] = useState(false)
+/** O que a confirmação diz antes de cada ação, conforme a situação atual da doação. */
+function confirmText(donation, action) {
+  const value = formatBRL(donation.amount)
+  const title = donation.campaignTitle
+  if (action === 'paid') {
+    return `Confirmar ${value} como pago?${title ? ` O valor entra na meta de ${title}.` : ' Doação livre, sem meta.'}`
+  }
+  if (donation.status === 'paid') {
+    return `Cancelar esta doação paga (estorno)?${title ? ` ${value} sai da meta de ${title}.` : ' Doação livre, sem meta para ajustar.'} Não dá para desfazer.`
+  }
+  return `Cancelar esta doação de ${value}? Ela não entra em nenhuma meta. Não dá para desfazer.`
+}
+
+/**
+ * Ações de uma doação, com confirmação na própria linha:
+ * pendente → "Marcar como paga" ou "Cancelar"; paga → "Cancelar (estornar)"; cancelada → nada.
+ */
+function DonationActions({ donation, onConfirm }) {
+  const [confirming, setConfirming] = useState(null) // null | 'paid' | 'canceled'
   const [sending, setSending] = useState(false)
 
-  if (donation.status !== 'pending') return <span className="t-muted">—</span>
+  if (donation.status === 'canceled') return <span className="t-muted">—</span>
 
   if (!confirming) {
     return (
-      <Button variant="outline" size="sm" icon="check" onClick={() => setConfirming(true)}>
-        Marcar como paga
-      </Button>
+      <div className="row">
+        {donation.status === 'pending' && (
+          <Button variant="outline" size="sm" icon="check" onClick={() => setConfirming('paid')}>Marcar como paga</Button>
+        )}
+        <Button variant="danger" size="sm" icon="x" onClick={() => setConfirming('canceled')}>
+          {donation.status === 'paid' ? 'Cancelar (estornar)' : 'Cancelar'}
+        </Button>
+      </div>
     )
   }
 
   async function confirm() {
     setSending(true)
-    // Se deu erro a linha continua na tela: volta ao botão.
-    if (!(await onConfirm(donation))) {
+    // Se deu erro a linha continua na tela: volta aos botões.
+    if (!(await onConfirm(donation, confirming))) {
       setSending(false)
-      setConfirming(false)
+      setConfirming(null)
     }
   }
 
+  const canceling = confirming === 'canceled'
   return (
     <div className="confirm-inline">
-      <span>
-        Confirmar {formatBRL(donation.amount)} como pago?
-        {donation.campaignTitle ? ` O valor entra na meta de ${donation.campaignTitle}.` : ' Doação livre, sem meta.'}
-      </span>
+      <span>{confirmText(donation, confirming)}</span>
       <div className="row">
-        <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={sending}>Cancelar</Button>
-        <Button size="sm" onClick={confirm} disabled={sending}>{sending ? 'Salvando…' : 'Confirmar'}</Button>
+        <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={sending}>Voltar</Button>
+        <Button variant={canceling ? 'danger' : 'primary'} size="sm" onClick={confirm} disabled={sending}>
+          {sending ? 'Salvando…' : canceling ? 'Confirmar cancelamento' : 'Confirmar pagamento'}
+        </Button>
       </div>
     </div>
   )
@@ -66,22 +87,28 @@ export default function AdminDonations() {
   const donations = useAsync(() => listDonations(), [])
   const [statusFilter, setStatusFilter] = useState('')
   const [campaignFilter, setCampaignFilter] = useState('')
-  // Resultado do último "Marcar como paga".
+  // Resultado da última ação (pagar ou cancelar).
   const [notice, setNotice] = useState(null)
 
   const all = donations.data ?? []
 
-  /** Confirma o pagamento e recarrega a lista. Devolve true se deu certo. */
-  async function handleMarkPaid(donation) {
+  /** Marca como paga ou cancela, e recarrega a lista. Devolve true se deu certo. */
+  async function handleChange(donation, action) {
     setNotice(null)
     try {
-      const result = await markDonationPaid(donation.id)
+      const result = action === 'paid' ? await markDonationPaid(donation.id) : await cancelDonation(donation.id)
+      const value = formatBRL(donation.amount)
+      const meta = result.campaign
+        ? `${result.campaign.title}: ${formatBRL(result.campaign.raised)} arrecadados de ${formatBRL(result.campaign.goal)}.`
+        : null
+      let text
+      if (action === 'paid') text = meta ?? 'Doação livre: não entra em nenhuma meta.'
+      else if (result.donation.previousStatus === 'paid') text = meta ? `${value} saiu da meta. ${meta}` : 'Doação livre: não havia meta para ajustar.'
+      else text = 'Ela não tinha entrado em nenhuma meta.'
       setNotice({
         tone: 'success',
-        title: `Doação de ${formatBRL(donation.amount)} marcada como paga`,
-        text: result.campaign
-          ? `${result.campaign.title}: ${formatBRL(result.campaign.raised)} arrecadados de ${formatBRL(result.campaign.goal)}.`
-          : 'Doação livre: não entra em nenhuma meta.'
+        title: action === 'paid' ? `Doação de ${value} marcada como paga` : `Doação de ${value} cancelada`,
+        text
       })
       await donations.reload()
       return true
@@ -94,7 +121,7 @@ export default function AdminDonations() {
       } else if (error.status === 403) {
         setNotice({ tone: 'danger', title: 'Acesso restrito', text: 'Esta área é só para administradores.' })
       } else {
-        setNotice({ tone: 'danger', title: 'Não foi possível marcar como paga', text: error.message })
+        setNotice({ tone: 'danger', title: 'Não foi possível salvar', text: error.message })
       }
       return false
     } finally {
@@ -207,7 +234,7 @@ export default function AdminDonations() {
                           <td>{donation.campaignTitle ?? <span className="t-muted">Doação livre</span>}</td>
                           <td className="is-number">{formatBRL(donation.amount)}</td>
                           <td><Badge tone={status.tone}>{status.label}</Badge></td>
-                          <td className="is-action"><MarkPaidCell donation={donation} onConfirm={handleMarkPaid} /></td>
+                          <td className="is-action"><DonationActions donation={donation} onConfirm={handleChange} /></td>
                         </tr>
                       )
                     })}

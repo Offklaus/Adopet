@@ -792,7 +792,7 @@ describe('marcar doação como paga (PATCH /api/donations/:id)', { skip }, () =>
 
     const { status, data } = await markPaid(id)
     assert.equal(status, 200)
-    assert.deepEqual(data.donation, { id, status: 'paid', amount: 100 })
+    assert.deepEqual(data.donation, { id, status: 'paid', amount: 100, previousStatus: 'pending' })
     assert.equal(data.campaign.raised, before.raised + 100)
 
     const after = await campaign('castracao')
@@ -817,13 +817,69 @@ describe('marcar doação como paga (PATCH /api/donations/:id)', { skip }, () =>
     assert.equal((await campaign('inverno-2026')).raised, before.raised + 50)
   })
 
-  test('status diferente de paid 422, doação inexistente 404, sem permissão 401', async () => {
+  test('status inválido 422, doação inexistente 404, sem permissão 401', async () => {
     const id = await donate('castracao', 10)
-    assert.equal((await markPaid(id, admin, 'canceled')).status, 422)
+    assert.equal((await markPaid(id, admin, 'pending')).status, 422)
     assert.equal((await markPaid('00000000-0000-0000-0000-000000000000')).status, 404)
     assert.equal((await markPaid('nao-e-uuid')).status, 404)
     assert.equal((await markPaid(id, {})).status, 401)
     const { data } = await api('/api/donations?status=pending', { headers: admin })
     assert.ok(data.some((donation) => donation.id === id))
+  })
+})
+
+describe('cancelar doação (PATCH /api/donations/:id { status: canceled })', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const donate = async (campaignId, amount) =>
+    (await api('/api/donations', { method: 'POST', body: { campaignId, amount } })).data.id
+  const setStatus = (id, status, headers = admin) => api(`/api/donations/${id}`, { method: 'PATCH', body: { status }, headers })
+  const campaign = async (id) => (await api('/api/campaigns')).data.find((item) => item.id === id)
+
+  test('cancelar pendente não mexe na meta', async () => {
+    const before = await campaign('castracao')
+    const id = await donate('castracao', 100)
+    const { status, data } = await setStatus(id, 'canceled')
+    assert.equal(status, 200)
+    assert.equal(data.donation.status, 'canceled')
+    assert.equal(data.campaign, null)
+    const after = await campaign('castracao')
+    assert.equal(after.raised, before.raised)
+    assert.equal(after.supporters, before.supporters)
+  })
+
+  test('cancelar paga (estorno) tira o valor e o apoiador da meta', async () => {
+    const before = await campaign('castracao')
+    const id = await donate('castracao', 100)
+    await setStatus(id, 'paid')
+    const { status, data } = await setStatus(id, 'canceled')
+    assert.equal(status, 200)
+    assert.equal(data.donation.previousStatus, 'paid')
+    assert.equal(data.campaign.raised, before.raised)
+    const after = await campaign('castracao')
+    assert.equal(after.raised, before.raised)
+    assert.equal(after.supporters, before.supporters)
+  })
+
+  test('cancelada é definitiva: não cancela de novo nem vira paga (409)', async () => {
+    const id = await donate(null, 30)
+    await setStatus(id, 'canceled')
+    assert.equal((await setStatus(id, 'canceled')).status, 409)
+    const { status, data } = await setStatus(id, 'paid')
+    assert.equal(status, 409)
+    assert.match(data.message, /já está cancelada/)
+  })
+
+  test('meta nunca fica negativa', async () => {
+    const id = await donate('reforma-canil', 500)
+    await setStatus(id, 'paid')
+    await db.query("UPDATE campaigns SET raised = 100, supporters = 0 WHERE id = 'reforma-canil'")
+    const { data } = await setStatus(id, 'canceled')
+    assert.equal(data.campaign.raised, 0)
+    assert.equal(data.campaign.supporters, 0)
+  })
+
+  test('sem login: 401', async () => {
+    const id = await donate(null, 10)
+    assert.equal((await setStatus(id, 'canceled', {})).status, 401)
   })
 })
