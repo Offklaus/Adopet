@@ -33,6 +33,10 @@ export class Router {
     return this.add('DELETE', path, handler)
   }
 
+  patch(path, handler) {
+    return this.add('PATCH', path, handler)
+  }
+
   /** Devolve { handler, params } ou lança 404/405. */
   match(method, pathname) {
     const allowed = []

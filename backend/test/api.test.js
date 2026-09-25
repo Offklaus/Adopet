@@ -512,6 +512,65 @@ describe('meus pedidos (GET /api/adoptions/mine)', { skip }, () => {
   })
 })
 
+describe('aprovar ou recusar pedidos (PATCH /api/adoptions/:id)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const newRequest = async (petId, name = 'Pessoa') =>
+    (await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId, name } })).data.id
+  const decide = (id, status, headers = admin) => api(`/api/adoptions/${id}`, { method: 'PATCH', body: { status }, headers })
+  const statusOf = async (id) => (await db.query('SELECT status FROM adoption_requests WHERE id = $1', [id])).rows[0].status
+  const petStatus = async (id) => (await api(`/api/pets/${id}`)).data.status
+
+  test('aprovar: pet vira adotado e os outros pedidos dele são recusados', async () => {
+    const first = await newRequest('thor', 'Primeira')
+    const second = await newRequest('thor', 'Segunda')
+    const otherPet = await newRequest('mel')
+
+    const { status, data } = await decide(first, 'approved')
+    assert.equal(status, 200)
+    assert.deepEqual(data.request, { id: first, status: 'approved' })
+    assert.equal(data.pet.status, 'adopted')
+    assert.equal(data.autoRejected, 1)
+
+    assert.equal(await statusOf(second), 'rejected')
+    assert.equal(await statusOf(otherPet), 'received')
+    assert.equal(await petStatus('thor'), 'adopted')
+    assert.equal(await petStatus('mel'), 'reserved')
+  })
+
+  test('recusar o último pedido em aberto devolve o pet para disponível', async () => {
+    const only = await newRequest('thor')
+    assert.equal(await petStatus('thor'), 'reserved')
+
+    const { data } = await decide(only, 'rejected')
+    assert.equal(data.pet.status, 'available')
+    assert.equal(await petStatus('thor'), 'available')
+  })
+
+  test('recusar com outro pedido em aberto mantém o pet em processo', async () => {
+    const first = await newRequest('thor')
+    await newRequest('thor')
+    const { data } = await decide(first, 'rejected')
+    assert.equal(data.pet.status, 'reserved')
+  })
+
+  test('pedido já decidido não muda de novo (409)', async () => {
+    const id = await newRequest('thor')
+    await decide(id, 'rejected')
+    const { status, data } = await decide(id, 'approved')
+    assert.equal(status, 409)
+    assert.match(data.message, /já foi recusado/)
+  })
+
+  test('status inválido 422, pedido inexistente 404, sem chave 401', async () => {
+    const id = await newRequest('thor')
+    assert.equal((await decide(id, 'talvez')).status, 422)
+    assert.equal((await decide('nao-e-uuid', 'approved')).status, 404)
+    assert.equal((await decide('00000000-0000-0000-0000-000000000000', 'approved')).status, 404)
+    assert.equal((await decide(id, 'approved', {})).status, 401)
+    assert.equal(await statusOf(id), 'received')
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')

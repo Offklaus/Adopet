@@ -8,6 +8,8 @@ import { createAdoptionsRepository } from './adoptionsRepository.js'
 
 const HOUSING = ['casa-quintal', 'casa', 'apartamento']
 const STATUSES = ['received', 'approved', 'rejected']
+const DECISIONS = ['approved', 'rejected']
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Mesmas regras do formulário do frontend (AdoptionForm.jsx). */
 function validateAdoption(body) {
@@ -81,5 +83,48 @@ export function registerAdoptionsRoutes(router, pool, { adminApiKey } = {}) {
     })
 
     return { status: 201, body: created }
+  })
+
+  // PATCH /api/adoptions/:id  { status: 'approved' | 'rejected' } (administração)
+  // Aprovar: pet vira "adopted" e os outros pedidos em aberto dele são recusados.
+  // Recusar: se não sobrar pedido em aberto, o pet volta a "available".
+  router.patch('/api/adoptions/:id', async ({ req, params }) => {
+    requireAdmin(req, adminApiKey)
+    const body = await readJson(req)
+    assertBodyIsObject(body)
+    if (!DECISIONS.includes(body.status)) {
+      assertValid({ status: 'Use "approved" para aprovar ou "rejected" para recusar.' })
+    }
+    if (!UUID.test(params.id)) throw new HttpError(404, 'Pedido não encontrado.')
+
+    const result = await withTransaction(pool, async (client) => {
+      const adoptions = createAdoptionsRepository(client)
+      const pets = createPetsRepository(client)
+
+      const request = await adoptions.findByIdForUpdate(params.id)
+      if (!request) throw new HttpError(404, 'Pedido não encontrado.')
+      if (request.status !== 'received') {
+        throw new HttpError(409, `Este pedido já foi ${request.status === 'approved' ? 'aprovado' : 'recusado'}.`)
+      }
+      const pet = await pets.findByIdForUpdate(request.pet_id)
+
+      if (body.status === 'approved') {
+        if (pet.status === 'adopted') throw new HttpError(409, `${pet.name} já foi adotado por outro pedido.`)
+        await adoptions.updateStatus(request.id, 'approved')
+        const autoRejected = await adoptions.rejectOpenForPet(pet.id, request.id)
+        await pets.updateStatus(pet.id, 'adopted')
+        return { request: { id: request.id, status: 'approved' }, pet: { id: pet.id, name: pet.name, status: 'adopted' }, autoRejected }
+      }
+
+      await adoptions.updateStatus(request.id, 'rejected')
+      let petStatus = pet.status
+      if (pet.status === 'reserved' && (await adoptions.countOpenForPet(pet.id)) === 0) {
+        await pets.updateStatus(pet.id, 'available')
+        petStatus = 'available'
+      }
+      return { request: { id: request.id, status: 'rejected' }, pet: { id: pet.id, name: pet.name, status: petStatus }, autoRejected: 0 }
+    })
+
+    return { status: 200, body: result }
   })
 }

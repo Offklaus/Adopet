@@ -48,6 +48,35 @@ export function createAdoptionsRepository(db) {
       return rows.map(toRequest)
     },
 
+    /** Lê o pedido travando a linha até o fim da transação (a decisão não pode acontecer duas vezes). */
+    async findByIdForUpdate(id) {
+      const { rows } = await db.query('SELECT * FROM adoption_requests WHERE id = $1 FOR UPDATE', [id])
+      return rows[0] ?? null
+    },
+
+    async updateStatus(id, status) {
+      await db.query('UPDATE adoption_requests SET status = $2 WHERE id = $1', [id, status])
+    },
+
+    /** Recusa os outros pedidos em aberto do mesmo pet. Devolve quantos foram recusados. */
+    async rejectOpenForPet(petId, exceptId) {
+      const { rowCount } = await db.query(
+        `UPDATE adoption_requests SET status = 'rejected'
+         WHERE pet_id = $1 AND id <> $2 AND status = 'received'`,
+        [petId, exceptId]
+      )
+      return rowCount
+    },
+
+    /** Pedidos ainda em aberto (recebidos) para um pet. */
+    async countOpenForPet(petId) {
+      const { rows } = await db.query(
+        `SELECT COUNT(*)::int AS total FROM adoption_requests WHERE pet_id = $1 AND status = 'received'`,
+        [petId]
+      )
+      return rows[0].total
+    },
+
     async create(request) {
       const { rows } = await db.query(
         `INSERT INTO adoption_requests

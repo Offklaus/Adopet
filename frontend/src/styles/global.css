@@ -200,6 +200,15 @@ img { max-width: 100%; }
   margin: 0; padding: var(--space-3) var(--space-4); background: var(--surface-sunken);
   border-radius: var(--radius-md); font-size: 15px; line-height: 22px; white-space: pre-line;
 }
+.request-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.request-card__confirm {
+  display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4);
+  background: var(--surface-sunken); border: 1px solid var(--line); border-radius: var(--radius-md);
+}
+.request-card__confirm p { margin: 0; }
+@media (max-width: 767px) {
+  .request-card__actions .ap-btn { flex: 1; }
+}
 @media (max-width: 767px) {
   .request-card { padding: var(--space-4); }
   .request-card__data { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -4,7 +4,7 @@ import { AdminKeyField } from '../components/admin/AdminKeyField'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
 import { useAdminKey } from '../hooks/useAdminKey'
-import { listAdoptionRequests } from '../services/adoptionsService'
+import { decideAdoptionRequest, listAdoptionRequests } from '../services/adoptionsService'
 
 const STATUS = {
   received: { tone: 'primary', label: 'Recebido' },
@@ -32,7 +32,57 @@ function formatPhone(digits) {
   return digits
 }
 
-function RequestCard({ request }) {
+/**
+ * Botões de decisão de um pedido recebido, com confirmação.
+ * `otherOpen` = outros pedidos em aberto para o mesmo pet (serão recusados se este for aprovado).
+ */
+function DecisionActions({ request, otherOpen, onDecide }) {
+  const [confirming, setConfirming] = useState(null) // null | 'approved' | 'rejected'
+  const [sending, setSending] = useState(false)
+
+  async function confirm() {
+    setSending(true)
+    const done = await onDecide(request, confirming)
+    // Se deu erro, o card continua na tela: volta aos botões.
+    if (!done) {
+      setSending(false)
+      setConfirming(null)
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <div className="request-card__actions">
+        <Button variant="danger" size="sm" icon="x" onClick={() => setConfirming('rejected')}>Recusar</Button>
+        <Button size="sm" icon="check" onClick={() => setConfirming('approved')}>Aprovar</Button>
+      </div>
+    )
+  }
+
+  const approving = confirming === 'approved'
+  return (
+    <div className="request-card__confirm" role="group" aria-label={approving ? 'Confirmar aprovação' : 'Confirmar recusa'}>
+      <p>
+        {approving ? (
+          <>
+            Aprovar o pedido de <strong>{request.name}</strong>? {request.petName} vai aparecer como adotado no site
+            {otherOpen > 0 && ` e ${otherOpen === 1 ? 'o outro pedido' : `os outros ${otherOpen} pedidos`} para ele ${otherOpen === 1 ? 'será recusado' : 'serão recusados'}`}.
+          </>
+        ) : (
+          <>Recusar o pedido de <strong>{request.name}</strong> para {request.petName}?</>
+        )}
+      </p>
+      <div className="request-card__actions">
+        <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={sending}>Cancelar</Button>
+        <Button variant={approving ? 'primary' : 'danger'} size="sm" onClick={confirm} disabled={sending}>
+          {sending ? 'Salvando…' : approving ? 'Confirmar aprovação' : 'Confirmar recusa'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function RequestCard({ request, otherOpen, onDecide }) {
   const status = STATUS[request.status]
   return (
     <li className="request-card">
@@ -57,6 +107,10 @@ function RequestCard({ request }) {
       </dl>
 
       {request.message && <p className="request-card__message">{request.message}</p>}
+
+      {request.status === 'received' && (
+        <DecisionActions request={request} otherOpen={otherOpen} onDecide={onDecide} />
+      )}
     </li>
   )
 }
@@ -70,6 +124,8 @@ export default function AdminAdoptions() {
   const [keyError, setKeyError] = useState()
   const [statusFilter, setStatusFilter] = useState('')
   const [query, setQuery] = useState('')
+  // Resultado da última decisão (aprovar/recusar).
+  const [notice, setNotice] = useState(null)
 
   async function load(key) {
     if (!key.trim()) {
@@ -95,6 +151,44 @@ export default function AdminAdoptions() {
     }
   }
 
+  /** Aprova ou recusa e recarrega a lista. Devolve true se deu certo. */
+  async function handleDecide(request, status) {
+    setNotice(null)
+    try {
+      const result = await decideAdoptionRequest(request.id, status, adminKey.trim())
+      const details = []
+      if (result.autoRejected > 0) {
+        details.push(`${result.autoRejected} outro(s) pedido(s) para ${result.pet.name} foram recusados.`)
+      }
+      if (status === 'rejected' && result.pet.status === 'available') {
+        details.push(`${result.pet.name} voltou a aparecer como disponível para adoção.`)
+      }
+      setNotice({
+        tone: 'success',
+        title: status === 'approved'
+          ? `Pedido aprovado: ${result.pet.name} foi adotado por ${request.name}`
+          : `Pedido de ${request.name} recusado`,
+        text: details.join(' ')
+      })
+      await load(adminKey)
+      return true
+    } catch (err) {
+      if (err.status === 401) {
+        setKeyError('Chave de administrador inválida.')
+        setNotice({ tone: 'danger', title: 'Chave recusada', text: 'Confira o valor de ADMIN_API_KEY no backend/.env.' })
+      } else if (err.status === 409) {
+        // Alguém já decidiu este pedido: mostra a situação atual.
+        setNotice({ tone: 'warning', title: err.message, text: 'A lista foi atualizada.' })
+        await load(adminKey)
+      } else {
+        setNotice({ tone: 'danger', title: 'Não foi possível salvar a decisão', text: err.message })
+      }
+      return false
+    } finally {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
   // Com a chave lembrada nesta aba, a lista abre direto.
   useEffect(() => {
     if (adminKey) load(adminKey)
@@ -104,6 +198,15 @@ export default function AdminAdoptions() {
   const counts = useMemo(() => {
     const result = { '': requests?.length ?? 0 }
     for (const request of requests ?? []) result[request.status] = (result[request.status] ?? 0) + 1
+    return result
+  }, [requests])
+
+  // Pedidos em aberto por pet, para avisar quantos serão recusados ao aprovar um deles.
+  const openByPet = useMemo(() => {
+    const result = {}
+    for (const request of requests ?? []) {
+      if (request.status === 'received') result[request.petId] = (result[request.petId] ?? 0) + 1
+    }
     return result
   }, [requests])
 
@@ -133,6 +236,7 @@ export default function AdminAdoptions() {
         </div>
 
         {error && <Alert tone="danger" title={error.title}>{error.text}</Alert>}
+        {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text || null}</Alert>}
 
         {!requests && (
           <form
@@ -183,7 +287,14 @@ export default function AdminAdoptions() {
               </div>
             ) : (
               <ul className="request-list">
-                {filtered.map((request) => <RequestCard key={request.id} request={request} />)}
+                {filtered.map((request) => (
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    otherOpen={(openByPet[request.petId] ?? 1) - 1}
+                    onDecide={handleDecide}
+                  />
+                ))}
               </ul>
             )}
           </>
