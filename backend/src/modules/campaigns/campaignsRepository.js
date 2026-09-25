@@ -20,6 +20,17 @@ export function createCampaignsRepository(db) {
       return rows.map(toCampaign)
     },
 
+    /** Soma uma doação paga na meta: raised += valor, supporters += 1. Devolve a campanha atualizada. */
+    async addDonation(id, amount) {
+      const { rows } = await db.query(
+        `UPDATE campaigns SET raised = raised + $2, supporters = supporters + 1
+         WHERE id = $1
+         RETURNING *`,
+        [id, amount]
+      )
+      return toCampaign(rows[0])
+    },
+
     async findActiveById(id) {
       const { rows } = await db.query('SELECT * FROM campaigns WHERE id = $1 AND active', [id])
       return toCampaign(rows[0])

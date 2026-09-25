@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { AdminNav } from '../components/admin/AdminNav'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
-import { Alert, Badge, Chip, Icon, TextField } from '../components/ui'
+import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
 import { useAsync } from '../hooks/useAsync'
-import { listDonations } from '../services/campaignsService'
+import { listDonations, markDonationPaid } from '../services/campaignsService'
 import { formatBRL } from '../utils/formatBRL'
 
 const STATUS = {
@@ -23,13 +23,84 @@ const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeSt
 
 const sumAmount = (list) => list.reduce((total, donation) => total + donation.amount, 0)
 
+/** Botão "Marcar como paga" de uma doação pendente, com confirmação na própria linha. */
+function MarkPaidCell({ donation, onConfirm }) {
+  const [confirming, setConfirming] = useState(false)
+  const [sending, setSending] = useState(false)
+
+  if (donation.status !== 'pending') return <span className="t-muted">—</span>
+
+  if (!confirming) {
+    return (
+      <Button variant="outline" size="sm" icon="check" onClick={() => setConfirming(true)}>
+        Marcar como paga
+      </Button>
+    )
+  }
+
+  async function confirm() {
+    setSending(true)
+    // Se deu erro a linha continua na tela: volta ao botão.
+    if (!(await onConfirm(donation))) {
+      setSending(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div className="confirm-inline">
+      <span>
+        Confirmar {formatBRL(donation.amount)} como pago?
+        {donation.campaignTitle ? ` O valor entra na meta de ${donation.campaignTitle}.` : ' Doação livre, sem meta.'}
+      </span>
+      <div className="row">
+        <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={sending}>Cancelar</Button>
+        <Button size="sm" onClick={confirm} disabled={sending}>{sending ? 'Salvando…' : 'Confirmar'}</Button>
+      </div>
+    </div>
+  )
+}
+
 /** Doações registradas no site (administração). */
 export default function AdminDonations() {
   const donations = useAsync(() => listDonations(), [])
   const [statusFilter, setStatusFilter] = useState('')
   const [campaignFilter, setCampaignFilter] = useState('')
+  // Resultado do último "Marcar como paga".
+  const [notice, setNotice] = useState(null)
 
   const all = donations.data ?? []
+
+  /** Confirma o pagamento e recarrega a lista. Devolve true se deu certo. */
+  async function handleMarkPaid(donation) {
+    setNotice(null)
+    try {
+      const result = await markDonationPaid(donation.id)
+      setNotice({
+        tone: 'success',
+        title: `Doação de ${formatBRL(donation.amount)} marcada como paga`,
+        text: result.campaign
+          ? `${result.campaign.title}: ${formatBRL(result.campaign.raised)} arrecadados de ${formatBRL(result.campaign.goal)}.`
+          : 'Doação livre: não entra em nenhuma meta.'
+      })
+      await donations.reload()
+      return true
+    } catch (error) {
+      if (error.status === 409) {
+        setNotice({ tone: 'warning', title: error.message, text: 'A lista foi atualizada.' })
+        await donations.reload()
+      } else if (error.status === 401) {
+        setNotice({ tone: 'danger', title: 'Sua sessão terminou', text: 'Entre de novo com a conta de administrador.' })
+      } else if (error.status === 403) {
+        setNotice({ tone: 'danger', title: 'Acesso restrito', text: 'Esta área é só para administradores.' })
+      } else {
+        setNotice({ tone: 'danger', title: 'Não foi possível marcar como paga', text: error.message })
+      }
+      return false
+    } finally {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
 
   // Campanhas que aparecem nas doações (e "Doação livre" para as sem campanha).
   const campaignOptions = useMemo(() => {
@@ -66,9 +137,11 @@ export default function AdminDonations() {
 
         {donations.data && (
           <>
+            {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text}</Alert>}
+
             <Alert tone="info" title="Pagamento ainda não integrado">
-              Toda doação fica como Pendente: o site registra a intenção de doar, e o valor só deve entrar na meta da
-              campanha quando o pagamento (Pix ou cartão) for confirmado.
+              Toda doação começa como Pendente. Quando o pagamento (Pix ou transferência) chegar, use "Marcar como
+              paga": só então o valor entra na meta da campanha.
             </Alert>
 
             <div className="stat-grid">
@@ -122,6 +195,7 @@ export default function AdminDonations() {
                       <th scope="col">Campanha</th>
                       <th scope="col" className="is-number">Valor</th>
                       <th scope="col">Situação</th>
+                      <th scope="col">Ação</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -133,6 +207,7 @@ export default function AdminDonations() {
                           <td>{donation.campaignTitle ?? <span className="t-muted">Doação livre</span>}</td>
                           <td className="is-number">{formatBRL(donation.amount)}</td>
                           <td><Badge tone={status.tone}>{status.label}</Badge></td>
+                          <td className="is-action"><MarkPaidCell donation={donation} onConfirm={handleMarkPaid} /></td>
                         </tr>
                       )
                     })}

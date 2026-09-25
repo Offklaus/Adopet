@@ -776,3 +776,54 @@ describe('lista de doações (GET /api/donations)', { skip }, () => {
     assert.equal(status, 201)
   })
 })
+
+describe('marcar doação como paga (PATCH /api/donations/:id)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const donate = async (campaignId, amount) =>
+    (await api('/api/donations', { method: 'POST', body: { campaignId, amount } })).data.id
+  const markPaid = (id, headers = admin, status = 'paid') => api(`/api/donations/${id}`, { method: 'PATCH', body: { status }, headers })
+  const campaign = async (id) => (await api('/api/campaigns')).data.find((item) => item.id === id)
+
+  test('marca como paga e soma o valor e um apoiador na meta da campanha', async () => {
+    const before = await campaign('castracao')
+    const id = await donate('castracao', 100)
+    // Pendente ainda não entra na meta.
+    assert.equal((await campaign('castracao')).raised, before.raised)
+
+    const { status, data } = await markPaid(id)
+    assert.equal(status, 200)
+    assert.deepEqual(data.donation, { id, status: 'paid', amount: 100 })
+    assert.equal(data.campaign.raised, before.raised + 100)
+
+    const after = await campaign('castracao')
+    assert.equal(after.raised, before.raised + 100)
+    assert.equal(after.supporters, before.supporters + 1)
+  })
+
+  test('doação livre muda para paga sem mexer em campanha', async () => {
+    const id = await donate(null, 30)
+    const { status, data } = await markPaid(id)
+    assert.equal(status, 200)
+    assert.equal(data.campaign, null)
+  })
+
+  test('marcar de novo responde 409 e não soma duas vezes', async () => {
+    const before = await campaign('inverno-2026')
+    const id = await donate('inverno-2026', 50)
+    await markPaid(id)
+    const { status, data } = await markPaid(id)
+    assert.equal(status, 409)
+    assert.match(data.message, /já está paga/)
+    assert.equal((await campaign('inverno-2026')).raised, before.raised + 50)
+  })
+
+  test('status diferente de paid 422, doação inexistente 404, sem permissão 401', async () => {
+    const id = await donate('castracao', 10)
+    assert.equal((await markPaid(id, admin, 'canceled')).status, 422)
+    assert.equal((await markPaid('00000000-0000-0000-0000-000000000000')).status, 404)
+    assert.equal((await markPaid('nao-e-uuid')).status, 404)
+    assert.equal((await markPaid(id, {})).status, 401)
+    const { data } = await api('/api/donations?status=pending', { headers: admin })
+    assert.ok(data.some((donation) => donation.id === id))
+  })
+})

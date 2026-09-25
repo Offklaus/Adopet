@@ -35,6 +35,16 @@ export function createDonationsRepository(db) {
       }))
     },
 
+    /** Lê a doação travando a linha até o fim da transação (não pode ser marcada como paga duas vezes). */
+    async findByIdForUpdate(id) {
+      const { rows } = await db.query('SELECT * FROM donations WHERE id = $1 FOR UPDATE', [id])
+      return rows[0] ?? null
+    },
+
+    async markPaid(id) {
+      await db.query(`UPDATE donations SET status = 'paid' WHERE id = $1`, [id])
+    },
+
     /** Registra a doação como 'pending'; o valor só entra na meta quando o pagamento for confirmado. */
     async create({ campaignId, amount }) {
       const { rows } = await db.query(

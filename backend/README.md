@@ -93,6 +93,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
 | GET | `/api/donations?status=pending\|paid\|canceled&campaignId=<id>\|livre` | Doações com o nome da campanha, mais recentes primeiro (**administração**) | 200, 400, 401, 403 |
+| PATCH | `/api/donations/:id` | `{ status: "paid" }`: confirma o pagamento de uma doação pendente (**administração**). O valor entra em `raised` da campanha e conta um apoiador. Responde `{ donation, campaign }` | 200, 401, 403, 404, 409, 422 |
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | PATCH | `/api/adoptions/:id` | `{ status: "approved" \| "rejected" }`: aprova ou recusa um pedido recebido (**administração**). Responde `{ request, pet, autoRejected }` | 200, 401, 404, 409, 422 |
