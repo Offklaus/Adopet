@@ -13,6 +13,7 @@ const PetRegister = lazy(() => import('./pages/PetRegister'))
 const PetEdit = lazy(() => import('./pages/PetEdit'))
 const AdminPets = lazy(() => import('./pages/AdminPets'))
 const AdminAdoptions = lazy(() => import('./pages/AdminAdoptions'))
+const AdminDonations = lazy(() => import('./pages/AdminDonations'))
 const Login = lazy(() => import('./pages/Login'))
 const MyAdoptions = lazy(() => import('./pages/MyAdoptions'))
 const NotFound = lazy(() => import('./pages/NotFound'))
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="animais/novo" element={<PetRegister />} />
           <Route path="animais/:id/editar" element={<PetEdit />} />
           <Route path="pedidos" element={<AdminAdoptions />} />
+          <Route path="doacoes" element={<AdminDonations />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>

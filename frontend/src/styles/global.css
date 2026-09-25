@@ -121,6 +121,43 @@ img { max-width: 100%; }
 .form-section + .form-section { border-top: 1px solid var(--line); padding-top: var(--space-6); }
 .form-section--danger { border-top: 1px solid var(--line); padding-top: var(--space-6); }
 .form-section--danger legend { color: var(--danger); }
+/* Abas da área administrativa */
+.admin-nav {
+  display: flex; gap: var(--space-1); padding: var(--space-1); width: fit-content; max-width: 100%;
+  overflow-x: auto; background: var(--surface-sunken); border-radius: var(--radius-pill);
+}
+.admin-nav__link {
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-pill); white-space: nowrap;
+  font-weight: 700; font-size: 15px; text-decoration: none; color: var(--ink-muted);
+}
+.admin-nav__link:hover { color: var(--ink); }
+.admin-nav__link.is-active { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-sm); }
+.admin-nav__link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Doações (/admin/doacoes): cartões de resumo, filtros e tabela */
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.stat-card {
+  display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4) var(--space-6);
+  background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+}
+.stat-card__label { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-muted); }
+.stat-card__value { font-family: var(--font-display); font-weight: 600; font-size: 32px; line-height: 40px; font-variant-numeric: tabular-nums; }
+.stat-card__hint { font-size: 14px; color: var(--ink-muted); }
+.donation-filters { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.donation-filters .ap-field { min-width: 240px; }
+.table-wrap { overflow-x: auto; background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.data-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.data-table th {
+  text-align: left; padding: var(--space-3) var(--space-4); background: var(--surface-sunken);
+  font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-muted);
+}
+.data-table td { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line); white-space: nowrap; }
+.data-table .is-number { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 767px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .donation-filters .ap-field { min-width: 0; width: 100%; }
+}
+
 /* Lista de administração (/admin/animais) */
 .admin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .admin-row {

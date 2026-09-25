@@ -33,7 +33,7 @@ export function createApp({
 
   registerPetsRoutes(router, db, { requireAdmin })
   registerCampaignsRoutes(router, db)
-  registerDonationsRoutes(router, db)
+  registerDonationsRoutes(router, db, { requireAdmin })
   registerAdoptionsRoutes(router, db, { currentUser, requireAdmin })
   registerAuthRoutes(router, db, { googleClientId, cookieSecure, adminEmails, ...(verifyGoogle && { verifyGoogle }) })
 

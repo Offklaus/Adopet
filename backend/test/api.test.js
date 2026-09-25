@@ -732,3 +732,47 @@ describe('usuário administrador', { skip }, () => {
     assert.equal((await api('/api/adoptions', { headers: { Authorization: `Bearer ${ADMIN_KEY}` } })).status, 200)
   })
 })
+
+describe('lista de doações (GET /api/donations)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const donate = (campaignId, amount) => api('/api/donations', { method: 'POST', body: { campaignId, amount } })
+
+  test('lista as doações com o nome da campanha, mais recentes primeiro', async () => {
+    await donate('castracao', 50)
+    await donate(null, 30)
+
+    const { status, data } = await api('/api/donations', { headers: admin })
+    assert.equal(status, 200)
+    assert.equal(data.length, 2)
+    assert.deepEqual(
+      data.map((donation) => [donation.campaignTitle, donation.amount, donation.status]),
+      [[null, 30, 'pending'], ['Mutirão de castração', 50, 'pending']]
+    )
+  })
+
+  test('filtra por campanha, doação livre e status', async () => {
+    await donate('castracao', 50)
+    await donate('inverno-2026', 100)
+    await donate(null, 30)
+
+    const porCampanha = await api('/api/donations?campaignId=castracao', { headers: admin })
+    assert.deepEqual(porCampanha.data.map((donation) => donation.amount), [50])
+    const livres = await api('/api/donations?campaignId=livre', { headers: admin })
+    assert.deepEqual(livres.data.map((donation) => donation.amount), [30])
+    const pagas = await api('/api/donations?status=paid', { headers: admin })
+    assert.equal(pagas.data.length, 0)
+    assert.equal((await api('/api/donations?status=xyz', { headers: admin })).status, 400)
+  })
+
+  test('só administrador: 401 sem login e 403 para adotante', async () => {
+    assert.equal((await api('/api/donations')).status, 401)
+    const { headers } = await api('/api/auth/google', { method: 'POST', body: { credential: 'google-bia' } })
+    const adopter = { Cookie: headers.get('set-cookie').split(';')[0] }
+    assert.equal((await api('/api/donations', { headers: adopter })).status, 403)
+  })
+
+  test('doar continua aberto para qualquer visitante', async () => {
+    const { status } = await donate('castracao', 20)
+    assert.equal(status, 201)
+  })
+})

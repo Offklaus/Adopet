@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminNav } from '../components/admin/AdminNav'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
 import { decideAdoptionRequest, listAdoptionRequests } from '../services/adoptionsService'
@@ -211,17 +212,15 @@ export default function AdminAdoptions() {
   return (
     <section className="section section--tight">
       <div className="container stack" style={{ gap: 24 }}>
+        <AdminNav />
         <div className="section__head" style={{ marginBottom: 0 }}>
           <div>
             <h1 className="t-display-lg">Pedidos de adoção</h1>
             {requests && <p className="t-muted">{requests.length} pedido(s) no banco de dados</p>}
           </div>
-          <div className="row">
-            {requests && (
-              <Button variant="ghost" onClick={() => load()} disabled={loading}>Atualizar</Button>
-            )}
-            <Button variant="outline" to="/admin/animais">Animais cadastrados</Button>
-          </div>
+          {requests && (
+            <Button variant="ghost" onClick={() => load()} disabled={loading}>Atualizar</Button>
+          )}
         </div>
 
         {error && <Alert tone="danger" title={error.title}>{error.text}</Alert>}

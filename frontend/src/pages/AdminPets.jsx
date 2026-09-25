@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { AdminNav } from '../components/admin/AdminNav'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Icon, TextField } from '../components/ui'
@@ -36,15 +37,13 @@ export default function AdminPets() {
   return (
     <section className="section section--tight">
       <div className="container stack" style={{ gap: 24 }}>
+        <AdminNav />
         <div className="section__head" style={{ marginBottom: 0 }}>
           <div>
             <h1 className="t-display-lg">Animais cadastrados</h1>
             {pets.data && <p className="t-muted">{pets.data.length} no banco de dados</p>}
           </div>
-          <div className="row">
-            <Button variant="outline" to="/admin/pedidos">Pedidos de adoção</Button>
-            <Button to="/admin/animais/novo" icon="paw">Cadastrar animal</Button>
-          </div>
+          <Button to="/admin/animais/novo" icon="paw">Cadastrar animal</Button>
         </div>
 
         {deletedName && (

@@ -70,6 +70,7 @@ frontend/src/
 | `/admin/animais/novo` | Cadastro de animal (só administrador) |
 | `/admin/animais/:id/editar` | Edição e exclusão de um animal (só administrador) |
 | `/admin/pedidos` | Pedidos de adoção com os dados de contato; aprovar ou recusar cada pedido recebido (só administrador) |
+| `/admin/doacoes` | Doações registradas: resumo em reais, filtros por situação e campanha, tabela (só administrador) |
 
 ### Integração com o backend
 
