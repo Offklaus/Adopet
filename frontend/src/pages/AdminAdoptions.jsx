@@ -86,12 +86,18 @@ function RequestCard({ request, otherOpen, onDecide }) {
   return (
     <li className="request-card">
       <div className="request-card__head">
-        <div>
-          <p className="request-card__pet">
-            <Link to={`/pets/${request.petId}`}>{request.petName}</Link>
-            {status && <Badge tone={status.tone}>{status.label}</Badge>}
-          </p>
-          <p className="t-body-sm t-muted">Recebido em {dateFormat.format(new Date(request.createdAt))}</p>
+        <div className="request-card__top">
+          {/* Mesmo link do nome: fica fora da navegação por teclado e do leitor de tela. */}
+          <Link to={`/pets/${request.petId}`} className="request-card__thumb" aria-hidden="true" tabIndex={-1}>
+            {request.petPhoto ? <img src={request.petPhoto} alt="" loading="lazy" /> : <Icon name="paw" size={28} />}
+          </Link>
+          <div>
+            <p className="request-card__pet">
+              <Link to={`/pets/${request.petId}`}>{request.petName}</Link>
+              {status && <Badge tone={status.tone}>{status.label}</Badge>}
+            </p>
+            <p className="t-body-sm t-muted">Recebido em {dateFormat.format(new Date(request.createdAt))}</p>
+          </div>
         </div>
         <Button variant="ghost" size="sm" to={`/admin/animais/${request.petId}/editar`}>Editar animal</Button>
       </div>
