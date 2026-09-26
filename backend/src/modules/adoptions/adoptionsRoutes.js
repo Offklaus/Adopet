@@ -128,4 +128,19 @@ export function registerAdoptionsRoutes(router, pool, { currentUser, requireAdmi
 
     return { status: 200, body: result }
   })
+
+  // POST /api/adoptions/:id/notified (administração): marca que o adotante foi avisado da decisão.
+  // DELETE na mesma rota desmarca (ex.: o WhatsApp abriu, mas a mensagem não foi enviada).
+  // Só vale para pedido aprovado ou recusado: em aberto, 409.
+  async function setNotified(req, id, on) {
+    await requireAdmin(req)
+    if (!UUID.test(id)) throw new HttpError(404, 'Pedido não encontrado.')
+    const adoptions = createAdoptionsRepository(pool)
+    const updated = await adoptions.setNotified(id, on)
+    if (updated) return { status: 200, body: updated }
+    if ((await adoptions.findStatus(id)) === null) throw new HttpError(404, 'Pedido não encontrado.')
+    throw new HttpError(409, 'Este pedido ainda não foi aprovado nem recusado: não há decisão para avisar.')
+  }
+  router.post('/api/adoptions/:id/notified', ({ req, params }) => setNotified(req, params.id, true))
+  router.delete('/api/adoptions/:id/notified', ({ req, params }) => setNotified(req, params.id, false))
 }

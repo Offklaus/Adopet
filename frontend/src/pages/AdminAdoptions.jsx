@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom'
 import { AdminNav } from '../components/admin/AdminNav'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
-import { decideAdoptionRequest, listAdoptionRequests } from '../services/adoptionsService'
+import {
+  decideAdoptionRequest,
+  listAdoptionRequests,
+  markAdoptionNotified,
+  unmarkAdoptionNotified
+} from '../services/adoptionsService'
 import { adoptionDecisionLink } from '../utils/whatsapp'
 
 const STATUS = {
@@ -15,8 +20,12 @@ const FILTERS = [
   { value: '', label: 'Todos' },
   { value: 'received', label: 'Recebidos' },
   { value: 'approved', label: 'Aprovados' },
-  { value: 'rejected', label: 'Recusados' }
+  { value: 'rejected', label: 'Recusados' },
+  // Aprovados ou recusados cujo adotante ainda não foi avisado.
+  { value: 'to-notify', label: 'Falta avisar' }
 ]
+
+const needsNotice = (request) => request.status !== 'received' && !request.notifiedAt
 const HOUSING = {
   'casa-quintal': 'Casa com quintal',
   casa: 'Casa sem quintal',
@@ -86,7 +95,8 @@ function DecisionActions({ request, otherOpen, onDecide }) {
  * Abre o WhatsApp do administrador na conversa com quem pediu, com a mensagem da decisão já escrita
  * (aprovado ou recusado). O envio é feito por ele, no WhatsApp.
  */
-function WhatsAppButton({ request, size = 'sm' }) {
+function WhatsAppButton({ request, size = 'sm', onNotified }) {
+  const again = Boolean(request.notifiedAt)
   return (
     <Button
       variant="outline"
@@ -95,14 +105,27 @@ function WhatsAppButton({ request, size = 'sm' }) {
       href={adoptionDecisionLink(request)}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`Avisar ${request.name} no WhatsApp (abre em outra aba)`}
+      // Abrir o WhatsApp com a mensagem já marca o pedido como avisado (dá para desmarcar).
+      onClick={() => onNotified(request, true)}
+      aria-label={`${again ? 'Avisar de novo' : 'Avisar'} ${request.name} no WhatsApp (abre em outra aba)`}
     >
-      Avisar no WhatsApp
+      {again ? 'Avisar de novo' : 'Avisar no WhatsApp'}
     </Button>
   )
 }
 
-function RequestCard({ request, otherOpen, onDecide }) {
+/** Situação do aviso de um pedido decidido: "Avisado em …" (com Desmarcar) ou "Falta avisar". */
+function NoticeStatus({ request, onNotified }) {
+  if (!request.notifiedAt) return <Badge tone="warning" icon="alert">Falta avisar</Badge>
+  return (
+    <span className="row">
+      <Badge tone="success" icon="check">Avisado em {dateFormat.format(new Date(request.notifiedAt))}</Badge>
+      <Button variant="ghost" size="sm" onClick={() => onNotified(request, false)}>Desmarcar</Button>
+    </span>
+  )
+}
+
+function RequestCard({ request, otherOpen, onDecide, onNotified }) {
   const status = STATUS[request.status]
   return (
     <li className="request-card">
@@ -137,8 +160,9 @@ function RequestCard({ request, otherOpen, onDecide }) {
       {request.status === 'received' ? (
         <DecisionActions request={request} otherOpen={otherOpen} onDecide={onDecide} />
       ) : (
-        <div className="request-card__actions">
-          <WhatsAppButton request={request} />
+        <div className="request-card__notice">
+          <NoticeStatus request={request} onNotified={onNotified} />
+          <WhatsAppButton request={request} onNotified={onNotified} />
         </div>
       )}
     </li>
@@ -217,13 +241,33 @@ export default function AdminAdoptions() {
     }
   }
 
+  /** Marca (on) ou desmarca o aviso e atualiza só aquele pedido na lista. */
+  async function handleNotified(request, on) {
+    try {
+      const updated = on ? await markAdoptionNotified(request.id) : await unmarkAdoptionNotified(request.id)
+      setRequests((current) =>
+        current?.map((item) => (item.id === updated.id ? { ...item, notifiedAt: updated.notifiedAt } : item))
+      )
+    } catch (err) {
+      setNotice(
+        sessionProblem(err)
+          ? { tone: 'danger', ...sessionProblem(err) }
+          : { tone: 'danger', title: 'Não foi possível registrar o aviso', text: err.message }
+      )
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
   useEffect(() => {
     load()
   }, [])
 
   const counts = useMemo(() => {
     const result = { '': requests?.length ?? 0 }
-    for (const request of requests ?? []) result[request.status] = (result[request.status] ?? 0) + 1
+    for (const request of requests ?? []) {
+      result[request.status] = (result[request.status] ?? 0) + 1
+      if (needsNotice(request)) result['to-notify'] = (result['to-notify'] ?? 0) + 1
+    }
     return result
   }, [requests])
 
@@ -239,7 +283,9 @@ export default function AdminAdoptions() {
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     return (requests ?? []).filter((request) => {
-      if (statusFilter && request.status !== statusFilter) return false
+      if (statusFilter === 'to-notify') {
+        if (!needsNotice(request)) return false
+      } else if (statusFilter && request.status !== statusFilter) return false
       if (!term) return true
       return `${request.petName} ${request.name} ${request.email} ${request.city}`.toLowerCase().includes(term)
     })
@@ -263,12 +309,20 @@ export default function AdminAdoptions() {
         {notice && (
           <div className="stack" style={{ gap: 8 }}>
             <Alert tone={notice.tone} title={notice.title}>{notice.text || null}</Alert>
-            {notice.decided && (
-              <div className="row">
-                <WhatsAppButton request={notice.decided} size="md" />
-                <span className="t-body-sm t-muted">Abre o seu WhatsApp com a mensagem pronta para {notice.decided.name}.</span>
-              </div>
-            )}
+            {notice.decided && (() => {
+              // O pedido como está na lista agora (com o aviso marcado, se já foi).
+              const decided = requests?.find((item) => item.id === notice.decided.id) ?? notice.decided
+              return (
+                <div className="row">
+                  <WhatsAppButton request={decided} size="md" onNotified={handleNotified} />
+                  <span className="t-body-sm t-muted">
+                    {decided.notifiedAt
+                      ? `Marcado como avisado em ${dateFormat.format(new Date(decided.notifiedAt))}.`
+                      : `Abre o seu WhatsApp com a mensagem pronta para ${decided.name}.`}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -303,6 +357,7 @@ export default function AdminAdoptions() {
                     request={request}
                     otherOpen={(openByPet[request.petId] ?? 1) - 1}
                     onDecide={handleDecide}
+                    onNotified={handleNotified}
                   />
                 ))}
               </ul>

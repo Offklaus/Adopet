@@ -701,6 +701,63 @@ describe('aprovar ou recusar pedidos (PATCH /api/adoptions/:id)', { skip }, () =
   })
 })
 
+describe('adotante avisado (POST e DELETE /api/adoptions/:id/notified)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const newRequest = async (petId = 'thor') => (await adopt({ ...validAdoption, petId })).data.id
+  const decide = (id, status) => api(`/api/adoptions/${id}`, { method: 'PATCH', body: { status }, headers: admin })
+  const notify = (id, method = 'POST', headers = admin) => api(`/api/adoptions/${id}/notified`, { method, headers })
+  const listed = async (id) => (await api('/api/adoptions', { headers: admin })).data.find((request) => request.id === id)
+
+  test('pedido novo aparece como não avisado', async () => {
+    const id = await newRequest()
+    assert.equal((await listed(id)).notifiedAt, null)
+  })
+
+  test('marca o aviso de um pedido decidido e a lista mostra a data; desmarcar volta a vazio', async () => {
+    const id = await newRequest()
+    await decide(id, 'approved')
+
+    const { status, data } = await notify(id)
+    assert.equal(status, 200)
+    assert.equal(data.status, 'approved')
+    assert.ok(data.notifiedAt)
+    assert.equal((await listed(id)).notifiedAt, data.notifiedAt)
+
+    const undo = await notify(id, 'DELETE')
+    assert.equal(undo.status, 200)
+    assert.equal(undo.data.notifiedAt, null)
+    assert.equal((await listed(id)).notifiedAt, null)
+  })
+
+  test('vale também para pedido recusado automaticamente', async () => {
+    const approved = await newRequest()
+    const other = await newRequest()
+    await decide(approved, 'approved')
+    const { status, data } = await notify(other)
+    assert.equal(status, 200)
+    assert.equal(data.status, 'rejected')
+  })
+
+  test('pedido ainda em aberto não pode ser marcado (409)', async () => {
+    const id = await newRequest()
+    const { status, data } = await notify(id)
+    assert.equal(status, 409)
+    assert.match(data.message, /ainda não foi aprovado nem recusado/)
+    assert.equal((await listed(id)).notifiedAt, null)
+  })
+
+  test('pedido inexistente 404; sem login 401; adotante logado 403', async () => {
+    assert.equal((await notify('00000000-0000-0000-0000-000000000000')).status, 404)
+    assert.equal((await notify('nao-e-uuid')).status, 404)
+    const id = await newRequest()
+    await decide(id, 'rejected')
+    assert.equal((await notify(id, 'POST', {})).status, 401)
+    const adopter = await adopterHeaders()
+    assert.equal((await notify(id, 'POST', adopter)).status, 403)
+    assert.equal((await listed(id)).notifiedAt, null)
+  })
+})
+
 describe('campanhas e doações', { skip }, () => {
   test('lista campanhas ativas, a mais recente primeiro', async () => {
     const { data } = await api('/api/campaigns')

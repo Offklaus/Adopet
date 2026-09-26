@@ -105,6 +105,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | PATCH | `/api/adoptions/:id` | `{ status: "approved" \| "rejected" }`: aprova ou recusa um pedido recebido (**administração**). Responde `{ request, pet, autoRejected }` | 200, 401, 404, 409, 422 |
+| POST · DELETE | `/api/adoptions/:id/notified` | Marca (POST, com a data de agora) ou desmarca (DELETE) que o adotante foi avisado da decisão (**administração**). Só pedido aprovado ou recusado (em aberto: 409). Responde `{ id, status, notifiedAt }`; a lista traz `notifiedAt` em cada pedido | 200, 401, 403, 404, 409 |
 | GET | `/api/adoptions/mine` | Pedidos da conta logada (cookie de sessão), com nome, foto e situação do animal | 200, 401 |
 | POST | `/api/adoptions` | `{ petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit: true }`. **Exige conta logada** (cookie de sessão); o pedido fica ligado a ela | 201, 401, 404, 409, 422 |
 

@@ -16,6 +16,19 @@ export async function decideAdoptionRequest(id, status) {
   return request(`/adoptions/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status } })
 }
 
+/**
+ * Marca que o adotante foi avisado da decisão (administração). Só pedido aprovado ou recusado (senão 409).
+ * Resposta: { id, status, notifiedAt }.
+ */
+export async function markAdoptionNotified(id) {
+  return request(`/adoptions/${encodeURIComponent(id)}/notified`, { method: 'POST' })
+}
+
+/** Desmarca o aviso (ex.: o WhatsApp abriu, mas a mensagem não foi enviada). Resposta: { id, status, notifiedAt: null }. */
+export async function unmarkAdoptionNotified(id) {
+  return request(`/adoptions/${encodeURIComponent(id)}/notified`, { method: 'DELETE' })
+}
+
 /** Pedidos da conta logada (a sessão vai no cookie). 401 se ninguém entrou. */
 export async function listMyAdoptionRequests() {
   return request('/adoptions/mine')

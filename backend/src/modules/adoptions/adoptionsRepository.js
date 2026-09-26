@@ -15,7 +15,8 @@ function toRequest(row) {
     message: row.message,
     agreeVisit: row.agree_visit,
     status: row.status,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    notifiedAt: row.notified_at
   }
 }
 
@@ -52,6 +53,25 @@ export function createAdoptionsRepository(db) {
     async findByIdForUpdate(id) {
       const { rows } = await db.query('SELECT * FROM adoption_requests WHERE id = $1 FOR UPDATE', [id])
       return rows[0] ?? null
+    },
+
+    /**
+     * Marca (on = true: agora) ou desmarca o aviso da decisão. Só pedido já decidido.
+     * Devolve { id, status, notifiedAt }, ou null se o pedido não existe ou ainda está em aberto.
+     */
+    async setNotified(id, on) {
+      const { rows } = await db.query(
+        `UPDATE adoption_requests SET notified_at = ${on ? 'now()' : 'NULL'}
+         WHERE id = $1 AND status <> 'received'
+         RETURNING id, status, notified_at`,
+        [id]
+      )
+      return rows[0] ? { id: rows[0].id, status: rows[0].status, notifiedAt: rows[0].notified_at } : null
+    },
+
+    async findStatus(id) {
+      const { rows } = await db.query('SELECT status FROM adoption_requests WHERE id = $1', [id])
+      return rows[0]?.status ?? null
     },
 
     async updateStatus(id, status) {
