@@ -12,6 +12,26 @@ export async function createCampaign(data) {
   return request('/campaigns', { method: 'POST', body: data })
 }
 
+/** Todas as campanhas, com as encerradas depois das ativas (administração). */
+export async function listAllCampaigns() {
+  return request('/campaigns?all=true')
+}
+
+/** Uma campanha, ativa ou encerrada (`active`, `endedAt`). */
+export async function getCampaign(id) {
+  return request(`/campaigns/${encodeURIComponent(id)}`)
+}
+
+/** Edita uma campanha ativa (administração). Mesmo corpo do createCampaign; arrecadado e apoiadores não mudam. */
+export async function updateCampaign(id, data) {
+  return request(`/campaigns/${encodeURIComponent(id)}`, { method: 'PUT', body: data })
+}
+
+/** Encerra uma campanha (administração): sai da página Doar e não recebe novas doações. Definitivo. */
+export async function endCampaign(id) {
+  return request(`/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', body: { active: false } })
+}
+
 /** Doações registradas, com o nome da campanha (administração: só para o administrador logado). */
 export async function listDonations() {
   return request('/donations')

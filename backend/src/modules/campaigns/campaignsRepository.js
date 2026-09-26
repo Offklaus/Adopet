@@ -11,7 +11,8 @@ function toCampaign(row) {
     goal: row.goal,
     supporters: row.supporters,
     active: row.active,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    endedAt: row.ended_at
   }
 }
 
@@ -24,6 +25,39 @@ export function createCampaignsRepository(db) {
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [makeId(title, 'campanha'), title, description, tag, goal]
+      )
+      return toCampaign(rows[0])
+    },
+
+    /** Todas (administração): ativas primeiro, depois as encerradas; cada grupo da mais recente para a mais antiga. */
+    async listAll() {
+      const { rows } = await db.query('SELECT * FROM campaigns ORDER BY active DESC, created_at DESC')
+      return rows.map(toCampaign)
+    },
+
+    async findById(id) {
+      const { rows } = await db.query('SELECT * FROM campaigns WHERE id = $1', [id])
+      return toCampaign(rows[0])
+    },
+
+    /** Edita título, descrição, etiqueta e meta. Só campanha ativa: devolve null se não existe ou já foi encerrada. */
+    async update(id, { title, description, tag, goal }) {
+      const { rows } = await db.query(
+        `UPDATE campaigns SET title = $2, description = $3, tag = $4, goal = $5
+         WHERE id = $1 AND active
+         RETURNING *`,
+        [id, title, description, tag, goal]
+      )
+      return toCampaign(rows[0])
+    },
+
+    /** Encerra uma campanha ativa. Devolve null se não existe ou já estava encerrada. */
+    async end(id) {
+      const { rows } = await db.query(
+        `UPDATE campaigns SET active = false, ended_at = now()
+         WHERE id = $1 AND active
+         RETURNING *`,
+        [id]
       )
       return toCampaign(rows[0])
     },

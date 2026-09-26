@@ -781,6 +781,85 @@ describe('criar campanha (POST /api/campaigns)', { skip }, () => {
   })
 })
 
+describe('editar e encerrar campanha (PUT e PATCH /api/campaigns/:id)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const edited = { title: 'Castração 2026', description: 'Agora também na zona norte.', tag: 'Saúde', goal: 9000 }
+  const end = (id, headers = admin) => api(`/api/campaigns/${id}`, { method: 'PATCH', body: { active: false }, headers })
+
+  test('busca uma campanha pelo id; inexistente devolve 404', async () => {
+    const { status, data } = await api('/api/campaigns/castracao')
+    assert.equal(status, 200)
+    assert.equal(data.title, 'Mutirão de castração')
+    assert.equal(data.active, true)
+    assert.equal(data.endedAt, null)
+    assert.equal((await api('/api/campaigns/nao-existe')).status, 404)
+  })
+
+  test('edita título, descrição, etiqueta e meta, sem mexer no arrecadado nem nos apoiadores', async () => {
+    const { status, data } = await api('/api/campaigns/castracao', { method: 'PUT', body: edited, headers: admin })
+    assert.equal(status, 200)
+    assert.equal(data.title, 'Castração 2026')
+    assert.equal(data.description, 'Agora também na zona norte.')
+    assert.equal(data.goal, 9000)
+    assert.equal(data.raised, 3150)
+    assert.equal(data.supporters, 97)
+  })
+
+  test('edição valida os campos (422) e exige login (401)', async () => {
+    const invalid = await api('/api/campaigns/castracao', { method: 'PUT', body: { ...edited, goal: 0, title: '' }, headers: admin })
+    assert.equal(invalid.status, 422)
+    assert.deepEqual(Object.keys(invalid.data.errors).sort(), ['goal', 'title'])
+    assert.equal((await api('/api/campaigns/castracao', { method: 'PUT', body: edited })).status, 401)
+    assert.equal((await api('/api/campaigns/nao-existe', { method: 'PUT', body: edited, headers: admin })).status, 404)
+  })
+
+  test('encerrar tira da página Doar e bloqueia novas doações, mas ela continua na lista do administrador', async () => {
+    const { status, data } = await end('castracao')
+    assert.equal(status, 200)
+    assert.equal(data.active, false)
+    assert.ok(data.endedAt)
+
+    const { data: publicas } = await api('/api/campaigns')
+    assert.deepEqual(publicas.map((campaign) => campaign.id), ['inverno-2026', 'reforma-canil'])
+
+    const { status: doacao } = await api('/api/donations', { method: 'POST', body: { campaignId: 'castracao', amount: 50 } })
+    assert.equal(doacao, 404)
+
+    const { data: todas } = await api('/api/campaigns?all=true', { headers: admin })
+    assert.deepEqual(todas.map((campaign) => campaign.id), ['inverno-2026', 'reforma-canil', 'castracao'])
+  })
+
+  test('doação pendente de uma campanha encerrada ainda pode ser marcada como paga', async () => {
+    const { data: donation } = await api('/api/donations', { method: 'POST', body: { campaignId: 'castracao', amount: 100 } })
+    await end('castracao')
+    const { status, data } = await api(`/api/donations/${donation.id}`, { method: 'PATCH', body: { status: 'paid' }, headers: admin })
+    assert.equal(status, 200)
+    assert.equal(data.campaign.raised, 3250)
+  })
+
+  test('encerrar é definitivo: encerrar de novo ou editar devolve 409', async () => {
+    await end('castracao')
+    const again = await end('castracao')
+    assert.equal(again.status, 409)
+    assert.match(again.data.message, /já foi encerrada/)
+    const edit = await api('/api/campaigns/castracao', { method: 'PUT', body: edited, headers: admin })
+    assert.equal(edit.status, 409)
+  })
+
+  test('encerrar: corpo diferente de { active: false } 422, inexistente 404, sem login 401', async () => {
+    const wrong = await api('/api/campaigns/castracao', { method: 'PATCH', body: { active: true }, headers: admin })
+    assert.equal(wrong.status, 422)
+    assert.equal((await end('nao-existe')).status, 404)
+    assert.equal((await end('castracao', {})).status, 401)
+    const { data } = await api('/api/campaigns/castracao')
+    assert.equal(data.active, true)
+  })
+
+  test('a lista com as encerradas é só para o administrador', async () => {
+    assert.equal((await api('/api/campaigns?all=true')).status, 401)
+  })
+})
+
 describe('pedidos de adoção', { skip }, () => {
   test('cria o pedido e deixa o pet "Em processo"', async () => {
     const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
