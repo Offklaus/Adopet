@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { useAsync } from '../hooks/useAsync'
 import { createAdoptionRequest } from '../services/adoptionsService'
 import { getPet } from '../services/petsService'
+import { normalizePhone } from '../utils/phone'
 import NotFound from './NotFound'
 
 const STEPS = ['Seus dados', 'Sua casa', 'Confirmação']
@@ -29,17 +30,34 @@ const INITIAL = {
   agreeVisit: false
 }
 
+// Em que etapa fica cada campo: um erro da API leva a pessoa de volta até ele.
+const FIELD_STEP = { name: 0, email: 0, phone: 0, city: 0, housing: 1, hasOtherPets: 1, message: 1, agreeVisit: 2 }
+
+/** Mesmas regras do backend (adoptionsRoutes.js), para o erro aparecer antes do envio. */
 function validate(step, values) {
   const errors = {}
   if (step === 0) {
     if (!values.name.trim()) errors.name = 'Informe seu nome.'
-    if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = 'Informe um e-mail válido.'
-    if (values.phone.replace(/\D/g, '').length < 10) errors.phone = 'Informe um telefone com DDD.'
+    else if (values.name.trim().length > 120) errors.name = 'O nome pode ter até 120 caracteres.'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errors.email = 'Informe um e-mail válido.'
+    if (!normalizePhone(values.phone)) errors.phone = 'Informe um telefone com DDD, por exemplo (35) 99999-9999.'
     if (!values.city.trim()) errors.city = 'Informe sua cidade.'
+    else if (values.city.trim().length > 120) errors.city = 'A cidade pode ter até 120 caracteres.'
   }
-  if (step === 1 && !values.housing) errors.housing = 'Escolha o tipo de moradia.'
+  if (step === 1) {
+    if (!values.housing) errors.housing = 'Escolha o tipo de moradia.'
+    if (values.message.length > 2000) errors.message = 'A mensagem pode ter até 2.000 caracteres.'
+  }
   if (step === 2 && !values.agreeVisit) errors.agreeVisit = 'É preciso aceitar a visita para seguir.'
   return errors
+}
+
+/** Texto do aviso quando o envio falha, conforme a resposta da API. */
+function failureText(error) {
+  if (error?.status === 422) return 'Confira o campo destacado e envie de novo.'
+  if (error?.status === 404 || error?.status === 409) return error.message
+  if (error?.status === 0) return 'Sem conexão com o servidor. Verifique sua internet e tente de novo.'
+  return 'O servidor não conseguiu registrar o pedido agora. Tente de novo em alguns instantes.'
 }
 
 export default function AdoptionForm() {
@@ -127,6 +145,13 @@ export default function AdoptionForm() {
     } catch (error) {
       setSendError(error)
       setStatus('failed')
+      // Campo recusado pela API: marca o campo e volta para a etapa dele.
+      const fieldErrors = error.status === 422 ? error.details?.errors ?? {} : {}
+      const fields = Object.keys(fieldErrors)
+      if (fields.length > 0) {
+        setErrors(fieldErrors)
+        setStep(Math.min(...fields.map((field) => FIELD_STEP[field] ?? STEPS.length - 1)))
+      }
     }
   }
 
@@ -174,6 +199,7 @@ export default function AdoptionForm() {
               multiline
               value={values.message}
               onChange={setField('message')}
+              error={errors.message}
               hint="Opcional. Ajuda a ONG a conhecer você."
             />
           </div>
@@ -190,18 +216,18 @@ export default function AdoptionForm() {
               onChange={setField('agreeVisit')}
             />
             {errors.agreeVisit && <p className="ap-field__hint" style={{ color: 'var(--danger)' }}>{errors.agreeVisit}</p>}
-            {status === 'failed' && (
-              sendError?.status === 401 ? (
-                <Alert tone="danger" title="Sua sessão terminou">
-                  <Link to={`/entrar?voltar=${back}`}>Entre de novo</Link> para enviar o pedido.
-                </Alert>
-              ) : (
-                <Alert tone="danger" title="Não foi possível enviar">
-                  {sendError?.status === 409 ? sendError.message : 'Verifique sua conexão e tente de novo.'}
-                </Alert>
-              )
-            )}
           </div>
+        )}
+
+        {/* Fora das etapas: aparece também quando a API manda de volta para um campo de outra etapa. */}
+        {status === 'failed' && (
+          sendError?.status === 401 ? (
+            <Alert tone="danger" title="Sua sessão terminou">
+              <Link to={`/entrar?voltar=${back}`}>Entre de novo</Link> para enviar o pedido.
+            </Alert>
+          ) : (
+            <Alert tone="danger" title="Não foi possível enviar">{failureText(sendError)}</Alert>
+          )
         )}
 
         <div className="form-actions">

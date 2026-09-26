@@ -1,6 +1,6 @@
 import { withTransaction } from '../../db/pool.js'
 import { HttpError, readJson } from '../../lib/http.js'
-import { assertBodyIsObject, assertValid, isEmail, isPhone, requiredText } from '../../lib/validate.js'
+import { assertBodyIsObject, assertValid, isEmail, isPhone, normalizePhone, requiredText } from '../../lib/validate.js'
 import { createPetsRepository } from '../pets/petsRepository.js'
 import { createAdoptionsRepository } from './adoptionsRepository.js'
 
@@ -70,7 +70,7 @@ export function registerAdoptionsRoutes(router, pool, { currentUser, requireAdmi
         petId: pet.id,
         name: body.name.trim(),
         email: body.email.trim().toLowerCase(),
-        phone: body.phone.replace(/\D/g, ''),
+        phone: normalizePhone(body.phone),
         city: body.city.trim(),
         housing: body.housing,
         hasOtherPets: body.hasOtherPets,

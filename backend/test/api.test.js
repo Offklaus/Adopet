@@ -903,6 +903,29 @@ describe('pedidos de adoção', { skip }, () => {
     assert.equal(saved.phone, '11912345678')
   })
 
+  test('aceita o telefone com +55 ou com 0 no DDD e grava só DDD + número', async () => {
+    const cases = [
+      ['+55 35 99999-9999', '35999999999'],
+      ['55 (35) 3471-1234', '3534711234'],
+      ['035 99999-9999', '35999999999'],
+      ['(35) 3471-1234', '3534711234']
+    ]
+    for (const [typed, stored] of cases) {
+      const { status, data } = await adopt({ ...validAdoption, phone: typed })
+      assert.equal(status, 201, typed)
+      const { rows: [saved] } = await db.query('SELECT phone FROM adoption_requests WHERE id = $1', [data.id])
+      assert.equal(saved.phone, stored, typed)
+    }
+  })
+
+  test('telefone sem DDD ou com dígitos a mais continua recusado', async () => {
+    for (const phone of ['99999-9999', '+1 415 555 0100 22', '(35) 99999-99999']) {
+      const { status, data } = await adopt({ ...validAdoption, phone })
+      assert.equal(status, 422, phone)
+      assert.ok(data.errors.phone, phone)
+    }
+  })
+
   test('aceita pedido para pet já em processo', async () => {
     const { status } = await adopt({ ...validAdoption, petId: 'pipoca' })
     assert.equal(status, 201)
