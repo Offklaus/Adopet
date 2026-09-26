@@ -9,8 +9,10 @@ export class ApiError extends Error {
   }
 }
 
-/** Cliente HTTP único do app: JSON de ida e volta, erro com status. */
+/** Cliente HTTP único do app: JSON de ida e volta (ou um arquivo na ida), erro com status. */
 export async function request(path, { method = 'GET', body, headers, signal } = {}) {
+  // Arquivo (ex.: foto) vai cru, com o tipo dele; o resto vai como JSON.
+  const isFile = body instanceof Blob
   let response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
@@ -18,10 +20,10 @@ export async function request(path, { method = 'GET', body, headers, signal } = 
       signal,
       headers: {
         Accept: 'application/json',
-        ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...(body !== undefined && { 'Content-Type': isFile ? body.type : 'application/json' }),
         ...headers
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined
+      body: body === undefined ? undefined : isFile ? body : JSON.stringify(body)
     })
   } catch (error) {
     if (error.name === 'AbortError') throw error

@@ -321,6 +321,99 @@ describe('exclusão de pets (DELETE /api/pets/:id)', { skip }, () => {
   })
 })
 
+describe('fotos enviadas (/api/photos)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  // Só a assinatura importa para a API: os primeiros bytes de cada formato.
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('resto-do-png')])
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from('resto-do-jpeg')])
+
+  async function upload(data, { type = 'image/png', headers = admin } = {}) {
+    const response = await fetch(`${baseUrl}/api/photos`, {
+      method: 'POST',
+      headers: { 'Content-Type': type, ...headers },
+      body: data
+    })
+    return { status: response.status, data: await response.json() }
+  }
+
+  async function getPhoto(url) {
+    const response = await fetch(`${baseUrl}${url}`)
+    return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) }
+  }
+
+  test('envia a imagem e ela volta igual, com o tipo detectado e cache longo', async () => {
+    const { status, data } = await upload(png)
+    assert.equal(status, 201)
+    assert.match(data.url, /^\/api\/photos\/[0-9a-f-]{36}$/)
+    assert.equal(data.contentType, 'image/png')
+
+    const photo = await getPhoto(data.url)
+    assert.equal(photo.status, 200)
+    assert.equal(photo.headers.get('content-type'), 'image/png')
+    assert.match(photo.headers.get('cache-control'), /immutable/)
+    assert.ok(photo.bytes.equals(png))
+  })
+
+  test('o tipo vem dos bytes, não do Content-Type declarado', async () => {
+    const { data } = await upload(jpeg, { type: 'image/png' })
+    assert.equal(data.contentType, 'image/jpeg')
+  })
+
+  test('recusa o que não é JPG, PNG ou WebP (415) e arquivo acima de 5 MB (413)', async () => {
+    const fake = await upload(Buffer.from('<svg onload="alert(1)"></svg>'), { type: 'image/svg+xml' })
+    assert.equal(fake.status, 415)
+    const text = await upload(png, { type: 'text/plain' })
+    assert.equal(text.status, 415)
+    const big = await upload(Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]))
+    assert.equal(big.status, 413)
+    assert.match(big.data.message, /5 MB/)
+  })
+
+  test('sem login devolve 401', async () => {
+    const { status } = await upload(png, { headers: {} })
+    assert.equal(status, 401)
+  })
+
+  test('foto inexistente ou id inválido devolve 404', async () => {
+    assert.equal((await getPhoto('/api/photos/00000000-0000-0000-0000-000000000000')).status, 404)
+    assert.equal((await getPhoto('/api/photos/nao-e-uuid')).status, 404)
+  })
+
+  test('cadastra o pet com a foto enviada; foto enviada que não existe devolve 422', async () => {
+    const { data: photo } = await upload(png)
+    const { data: pet } = await api('/api/pets/bento')
+    const { status, data } = await api('/api/pets', {
+      method: 'POST',
+      headers: admin,
+      body: { ...pet, name: 'Com foto', photo: photo.url }
+    })
+    assert.equal(status, 201)
+    assert.equal(data.photo, photo.url)
+
+    const missing = await api('/api/pets', {
+      method: 'POST',
+      headers: admin,
+      body: { ...pet, photo: '/api/photos/00000000-0000-0000-0000-000000000000' }
+    })
+    assert.equal(missing.status, 422)
+    assert.match(missing.data.errors.photo, /não foi encontrada/)
+  })
+
+  test('trocar a foto apaga a antiga; excluir o pet apaga a foto dele', async () => {
+    const { data: first } = await upload(png)
+    const { data: second } = await upload(jpeg)
+    const { data: pet } = await api('/api/pets/bento')
+
+    await api('/api/pets/bento', { method: 'PUT', headers: admin, body: { ...pet, photo: first.url } })
+    await api('/api/pets/bento', { method: 'PUT', headers: admin, body: { ...pet, photo: second.url } })
+    assert.equal((await getPhoto(first.url)).status, 404)
+    assert.equal((await getPhoto(second.url)).status, 200)
+
+    await api('/api/pets/bento', { method: 'DELETE', headers: admin })
+    assert.equal((await getPhoto(second.url)).status, 404)
+  })
+})
+
 describe('listagem de pedidos de adoção (GET /api/adoptions)', { skip }, () => {
   const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
 

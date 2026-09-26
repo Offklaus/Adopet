@@ -18,13 +18,14 @@ export function sendJson(res, status, data, headers = {}) {
   res.end(body)
 }
 
-/** Lê o corpo como JSON, com limite de tamanho. */
-export async function readJson(req, { limit = 100_000 } = {}) {
-  const contentType = req.headers['content-type'] ?? ''
-  if (!contentType.includes('application/json')) {
-    throw new HttpError(415, 'Envie o corpo como application/json.')
-  }
+/** Resposta binária (ex.: foto), com os cabeçalhos do handler. */
+export function sendBinary(res, status, buffer, headers = {}) {
+  res.writeHead(status, { ...headers, 'Content-Length': buffer.length })
+  res.end(buffer)
+}
 
+/** Lê o corpo inteiro como Buffer, com limite de tamanho. */
+export async function readBody(req, { limit, tooLargeMessage = 'Corpo da requisição muito grande.' }) {
   const chunks = []
   let size = 0
   let tooLarge = false
@@ -34,10 +35,20 @@ export async function readJson(req, { limit = 100_000 } = {}) {
     if (size > limit) tooLarge = true
     else chunks.push(chunk)
   }
-  if (tooLarge) throw new HttpError(413, 'Corpo da requisição muito grande.')
+  if (tooLarge) throw new HttpError(413, tooLargeMessage)
+  return Buffer.concat(chunks)
+}
 
+/** Lê o corpo como JSON, com limite de tamanho. */
+export async function readJson(req, { limit = 100_000 } = {}) {
+  const contentType = req.headers['content-type'] ?? ''
+  if (!contentType.includes('application/json')) {
+    throw new HttpError(415, 'Envie o corpo como application/json.')
+  }
+
+  const body = await readBody(req, { limit })
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null')
+    return JSON.parse(body.toString('utf8') || 'null')
   } catch {
     throw new HttpError(400, 'JSON inválido.')
   }

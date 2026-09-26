@@ -20,6 +20,14 @@ export async function createPet(data) {
   return request('/pets', { method: 'POST', body: data })
 }
 
+/**
+ * Envia a foto de um animal (JPG, PNG ou WebP, até 5 MB).
+ * Resposta: { id, url }; a url ("/api/photos/<id>") vai no campo photo do cadastro.
+ */
+export async function uploadPetPhoto(file) {
+  return request('/photos', { method: 'POST', body: file })
+}
+
 /** Exclui um animal. A API recusa (409) se ele tiver pedidos de adoção. */
 export async function deletePet(id) {
   return request(`/pets/${encodeURIComponent(id)}`, { method: 'DELETE' })

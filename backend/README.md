@@ -56,7 +56,7 @@ backend/
 │   ├── config.js            lê o .env
 │   ├── lib/
 │   │   ├── router.js        roteador com parâmetros (/api/pets/:id)
-│   │   ├── http.js          HttpError, sendJson, readJson (limite de 100 KB)
+│   │   ├── http.js          HttpError, sendJson, sendBinary, readJson (limite de 100 KB), readBody
 │   │   ├── cors.js          libera só as origens de CORS_ORIGIN
 │   │   └── validate.js      validações reutilizáveis
 │   ├── db/
@@ -71,6 +71,7 @@ backend/
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
 │       ├── auth/            contas, login, Google e sessões
 │       ├── pets/
+│       ├── photos/          fotos enviadas no cadastro (tabela pet_photos)
 │       ├── campaigns/
 │       ├── donations/
 │       └── adoptions/
@@ -91,6 +92,8 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | POST | `/api/pets` | Cadastra um animal (**administração**) | 201, 401, 403, 422 |
 | PUT | `/api/pets/:id` | Edita um animal (**administração**). Mesmo corpo e validação do POST; substitui o cadastro inteiro, mantendo `id` e data de cadastro | 200, 401, 404, 422, 503 |
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
+| POST | `/api/photos` | Envia a foto de um animal (**administração**). Corpo = o arquivo, com `Content-Type: image/jpeg`, `image/png` ou `image/webp`, até 5 MB. O tipo é conferido pelos bytes do arquivo. Responde `{ id, url }`: a `url` (`/api/photos/<id>`) vai no campo `photo` do animal | 201, 400, 401, 403, 413, 415 |
+| GET | `/api/photos/:id` | A imagem em si, com cache longo (uma foto nunca muda: trocar gera outro id) | 200, 404 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
 | GET | `/api/donations?status=pending\|paid\|canceled&campaignId=<id>\|livre` | Doações com o nome da campanha, mais recentes primeiro (**administração**) | 200, 400, 401, 403 |
 | PATCH | `/api/donations/:id` | (**administração**) `{ status: "paid" }` confirma o pagamento de uma doação pendente: o valor entra em `raised` da campanha e conta um apoiador. `{ status: "canceled" }` cancela uma pendente (nada muda na meta) ou uma paga (estorno: o valor e o apoiador saem da meta, sem ficar negativo). Cancelada é definitiva. Responde `{ donation: { ..., previousStatus }, campaign }` | 200, 401, 403, 404, 409, 422 |
@@ -149,7 +152,7 @@ O ID do cliente não é segredo (ele aparece na página); o que não pode vazar 
 | `latitude`, `longitude` | não | números; as duas juntas |
 | `tags` | não | até 5 etiquetas, ex.: `["Vacinado", "Castrado"]` |
 | `story` | não | história do animal, até 2.000 caracteres |
-| `photo`, `photoAlt` | não | link `https://` da foto e a descrição dela |
+| `photo`, `photoAlt` | não | link `https://` da foto, ou a `url` devolvida pelo `POST /api/photos`, e a descrição dela |
 | `status` | não | `available` (padrão), `reserved` ou `adopted` |
 
 No PowerShell (a chave está em `ADMIN_API_KEY` no `backend/.env`):
@@ -172,4 +175,5 @@ No Postman ou Insomnia: `POST http://localhost:3333/api/pets`, aba **Auth** → 
 ### Regras de negócio
 - **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com dígitos. Se a pessoa está logada, o pedido fica ligado à conta (`user_id`) e aparece em "Meus pedidos"; sem login, o pedido funciona igual e fica sem conta.
 - **Decisão do pedido:** só pedidos `received` podem ser aprovados ou recusados (os outros respondem 409). **Aprovar** marca o pet como `adopted` e recusa os outros pedidos em aberto dele. **Recusar** o último pedido em aberto de um pet `reserved` devolve o pet para `available`. Tudo numa transação, com o pedido e o pet travados.
+- **Fotos enviadas:** ficam no banco (tabela `pet_photos`, coluna `bytea`). Um animal só aceita `/api/photos/<id>` de uma foto que existe (senão 422). Quando a foto de um animal é trocada ou o animal é excluído, a foto enviada que ficou sem uso é apagada.
 - **Doação:** fica `pending`. O valor só deve entrar em `raised` da campanha quando o pagamento for confirmado (ainda não há integração de pagamento).

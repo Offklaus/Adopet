@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { uploadPetPhoto } from '../../services/petsService'
 import { Alert, Button, Chip, TextField } from '../ui'
 
 const MAX_TAGS = 5
+// Mesmas regras do POST /api/photos (photosRoutes.js).
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_PHOTO_MB = 5
+// Foto enviada pelo site: a API devolve "/api/photos/<id>".
+const isUploadedPhoto = (value) => /^\/api\/photos\/[0-9a-f-]{36}$/i.test(value)
 
 const SPECIES = [
   { value: '', label: 'Selecione' },
@@ -116,7 +122,8 @@ function validate(values) {
   if (!values.sex) errors.sex = 'Escolha o sexo.'
   if (!values.size) errors.size = 'Escolha o porte.'
   if (values.story.length > 2000) errors.story = 'A história pode ter até 2.000 caracteres.'
-  if (values.photo.trim() && !isHttpUrl(values.photo.trim())) errors.photo = 'Use um link que comece com http:// ou https://.'
+  const photo = values.photo.trim()
+  if (photo && !isHttpUrl(photo) && !isUploadedPhoto(photo)) errors.photo = 'Use um link que comece com http:// ou https://.'
   if (!values.city.trim()) errors.city = 'Informe a cidade.'
   if (!values.state) errors.state = 'Escolha a UF.'
 
@@ -197,6 +204,8 @@ export function PetForm({
   const [sending, setSending] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [photoBroken, setPhotoBroken] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInput = useRef(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -216,6 +225,40 @@ export function PetForm({
       if (!selected && current.tags.length + current.extraTags.length >= MAX_TAGS) return current
       return { ...current, tags: selected ? current.tags.filter((item) => item !== key) : [...current.tags, key] }
     })
+  }
+
+  function setPhoto(photo, error) {
+    setPhotoBroken(false)
+    setValues((current) => ({ ...current, photo }))
+    setErrors((current) => ({ ...current, photo: error }))
+  }
+
+  /** Envia o arquivo escolhido na hora; a url devolvida vira a foto do animal. */
+  async function handlePhotoFile(event) {
+    const file = event.target.files?.[0]
+    // Limpa a escolha para o mesmo arquivo poder ser escolhido de novo.
+    event.target.value = ''
+    if (!file) return
+    if (!PHOTO_TYPES.includes(file.type)) {
+      setErrors((current) => ({ ...current, photo: 'Escolha uma imagem JPG, PNG ou WebP.' }))
+      return
+    }
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setErrors((current) => ({ ...current, photo: `A foto pode ter até ${MAX_PHOTO_MB} MB.` }))
+      return
+    }
+
+    setUploading(true)
+    setErrors((current) => ({ ...current, photo: undefined }))
+    try {
+      const { url } = await uploadPetPhoto(file)
+      setPhoto(url, undefined)
+    } catch (error) {
+      if (sessionProblem(error)) showFeedback(sessionProblem(error))
+      else setErrors((current) => ({ ...current, photo: error.message }))
+    } finally {
+      setUploading(false)
+    }
   }
 
   function removeExtraTag(label) {
@@ -285,7 +328,8 @@ export function PetForm({
   }
 
   const photoUrl = values.photo.trim()
-  const showPreview = isHttpUrl(photoUrl) && !photoBroken
+  const uploaded = isUploadedPhoto(photoUrl)
+  const showPreview = (uploaded || isHttpUrl(photoUrl)) && !photoBroken
 
   return (
     <section className="section section--tight">
@@ -355,17 +399,42 @@ export function PetForm({
 
         <fieldset className="form-section">
           <legend className="t-heading-sm">Foto</legend>
-          <TextField
-            label="Link da foto"
-            type="url"
-            placeholder="https://..."
-            value={values.photo}
-            onChange={setField('photo')}
-            error={errors.photo}
-            hint="Opcional. Sem foto, o card mostra a pata."
-          />
           {showPreview && (
             <img className="photo-preview" src={photoUrl} alt="Prévia da foto" onError={() => setPhotoBroken(true)} />
+          )}
+          <div className="stack" style={{ gap: 8 }}>
+            <input
+              ref={fileInput}
+              type="file"
+              accept={PHOTO_TYPES.join(',')}
+              onChange={handlePhotoFile}
+              hidden
+            />
+            <div className="row">
+              <Button variant="outline" icon="upload" onClick={() => fileInput.current?.click()} disabled={uploading}>
+                {uploading ? 'Enviando foto…' : photoUrl ? 'Trocar foto' : 'Enviar foto do computador'}
+              </Button>
+              {photoUrl && (
+                <Button variant="ghost" icon="x" onClick={() => setPhoto('', undefined)} disabled={uploading}>
+                  Remover foto
+                </Button>
+              )}
+            </div>
+            <p className="ap-field__hint" style={errors.photo && uploaded ? { color: 'var(--danger)' } : undefined}>
+              {(uploaded && errors.photo) ||
+                (uploaded ? 'Foto enviada. Ela é salva junto com o cadastro.' : `JPG, PNG ou WebP, até ${MAX_PHOTO_MB} MB.`)}
+            </p>
+          </div>
+          {!uploaded && (
+            <TextField
+              label="Ou cole o link de uma foto"
+              type="url"
+              placeholder="https://..."
+              value={values.photo}
+              onChange={setField('photo')}
+              error={errors.photo}
+              hint="Opcional. Sem foto, o card mostra a pata."
+            />
           )}
           <TextField
             label="Descrição da foto"

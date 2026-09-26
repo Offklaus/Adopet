@@ -1,5 +1,6 @@
 import { HttpError, readJson } from '../../lib/http.js'
 import { assertBodyIsObject, assertValid, requiredText } from '../../lib/validate.js'
+import { createPhotosRepository, photoIdFrom } from '../photos/photosRepository.js'
 import { createPetsRepository } from './petsRepository.js'
 
 const SPECIES = ['cao', 'gato']
@@ -42,8 +43,11 @@ function parsePet(body) {
   }
 
   if (!optionalText(body.story, 2000)) errors.story = 'A história pode ter até 2.000 caracteres.'
-  if (body.photo != null && (typeof body.photo !== 'string' || body.photo.length > 500 || !isHttpUrl(body.photo))) {
-    errors.photo = 'A foto deve ser um link http(s).'
+  if (
+    body.photo != null &&
+    (typeof body.photo !== 'string' || body.photo.length > 500 || !(isHttpUrl(body.photo) || photoIdFrom(body.photo)))
+  ) {
+    errors.photo = 'A foto deve ser um link http(s) ou uma foto enviada pelo site.'
   }
   if (!optionalText(body.photoAlt, 200)) errors.photoAlt = 'A descrição da foto pode ter até 200 caracteres.'
 
@@ -86,6 +90,15 @@ function parsePet(body) {
 /** `requireAdmin(req)` vem do app.js (createAdminGuard): administrador logado ou ADMIN_API_KEY. */
 export function registerPetsRoutes(router, db, { requireAdmin }) {
   const pets = createPetsRepository(db)
+  const photos = createPhotosRepository(db)
+
+  /** Uma foto enviada (/api/photos/<id>) precisa existir no banco. */
+  async function assertPhotoExists(photo) {
+    const id = photoIdFrom(photo)
+    if (id && !(await photos.exists(id))) {
+      assertValid({ photo: 'A foto enviada não foi encontrada. Envie a imagem de novo.' })
+    }
+  }
 
   // GET /api/pets?species=cao|gato&q=texto
   router.get('/api/pets', async ({ query }) => {
@@ -108,7 +121,9 @@ export function registerPetsRoutes(router, db, { requireAdmin }) {
     await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
-    return { status: 201, body: await pets.create(parsePet(body)) }
+    const data = parsePet(body)
+    await assertPhotoExists(data.photo)
+    return { status: 201, body: await pets.create(data) }
   })
 
   // PUT /api/pets/:id (administração): edita um animal. Mesmo corpo e validação do cadastro.
@@ -116,8 +131,14 @@ export function registerPetsRoutes(router, db, { requireAdmin }) {
     await requireAdmin(req)
     const body = await readJson(req)
     assertBodyIsObject(body)
-    const pet = await pets.update(params.id, parsePet(body))
+    const data = parsePet(body)
+    const before = await pets.findById(params.id)
+    if (!before) throw new HttpError(404, 'Pet não encontrado.')
+    await assertPhotoExists(data.photo)
+    const pet = await pets.update(params.id, data)
     if (!pet) throw new HttpError(404, 'Pet não encontrado.')
+    // Trocou ou tirou uma foto enviada: a antiga sai do banco.
+    if (before.photo !== pet.photo) await photos.removeIfUnused(before.photo)
     return { status: 200, body: pet }
   })
 
@@ -143,6 +164,7 @@ export function registerPetsRoutes(router, db, { requireAdmin }) {
       if (error.code === '23503') throw blocked(await pets.countAdoptionRequests(pet.id))
       throw error
     }
+    await photos.removeIfUnused(pet.photo)
     return { status: 200, body: { id: pet.id, deleted: true } }
   })
 }

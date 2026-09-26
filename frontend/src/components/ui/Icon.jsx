@@ -8,6 +8,7 @@ const PATHS = {
   info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01',
   alert: 'M12 3l9.5 17h-19L12 3zM12 10v4M12 17h.01',
   x: 'M6 6l12 12M18 6L6 18',
+  upload: 'M12 15V4M7 9l5-5 5 5M4 15v5h16v-5',
   'arrow-right': 'M5 12h14M13 6l6 6-6 6',
   'arrow-left': 'M19 12H5M11 6l-6 6 6 6',
   home: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z',
