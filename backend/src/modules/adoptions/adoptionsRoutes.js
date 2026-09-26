@@ -50,12 +50,13 @@ export function registerAdoptionsRoutes(router, pool, { currentUser, requireAdmi
   })
 
   // POST /api/adoptions  { petId, name, email, phone, city, housing, hasOtherPets, message?, agreeVisit }
+  // Exige conta logada: o pedido fica ligado à conta ("Meus pedidos").
   router.post('/api/adoptions', async ({ req }) => {
+    const user = await currentUser(req)
+    if (!user) throw new HttpError(401, 'Entre na sua conta para pedir uma adoção.')
     const body = await readJson(req)
     assertBodyIsObject(body)
     validateAdoption(body)
-    // Se a pessoa está logada, o pedido fica ligado à conta dela ("Meus pedidos").
-    const user = await currentUser(req)
 
     const created = await withTransaction(pool, async (client) => {
       const pets = createPetsRepository(client)
@@ -75,7 +76,7 @@ export function registerAdoptionsRoutes(router, pool, { currentUser, requireAdmi
         hasOtherPets: body.hasOtherPets,
         message: body.message?.trim() ?? '',
         agreeVisit: true,
-        userId: user?.id ?? null
+        userId: user.id
       })
       // O primeiro pedido deixa o pet "Em processo" no site.
       if (pet.status === 'available') await pets.updateStatus(pet.id, 'reserved')

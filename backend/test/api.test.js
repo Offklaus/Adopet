@@ -61,6 +61,21 @@ async function api(path, { method = 'GET', body, headers } = {}) {
   return { status: response.status, headers: response.headers, data: text ? JSON.parse(text) : null }
 }
 
+// Pedido de adoção exige conta logada: os testes usam uma conta de adotante (criada na primeira vez em cada teste).
+async function adopterHeaders() {
+  const account = { name: 'Adotante', email: 'adotante@exemplo.com', password: 'senha-forte-123', confirmPassword: 'senha-forte-123' }
+  let response = await api('/api/auth/register', { method: 'POST', body: account })
+  if (response.status === 409) {
+    response = await api('/api/auth/login', { method: 'POST', body: { email: account.email, password: account.password } })
+  }
+  return { Cookie: response.headers.get('set-cookie').split(';')[0] }
+}
+
+/** POST /api/adoptions já logado como adotante (ou com os cabeçalhos passados). */
+async function adopt(body, headers) {
+  return api('/api/adoptions', { method: 'POST', body, headers: headers ?? (await adopterHeaders()) })
+}
+
 const validAdoption = {
   petId: 'thor',
   name: 'Ana Souza',
@@ -299,7 +314,7 @@ describe('exclusão de pets (DELETE /api/pets/:id)', { skip }, () => {
   })
 
   test('recusa (409) se houver pedido de adoção e mantém o pet', async () => {
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' } })
+    await adopt({ ...validAdoption, petId: 'thor' })
     const { status, data } = await api('/api/pets/thor', { method: 'DELETE', headers: admin })
     assert.equal(status, 409)
     assert.match(data.message, /Thor tem 1 pedido/)
@@ -418,8 +433,8 @@ describe('listagem de pedidos de adoção (GET /api/adoptions)', { skip }, () =>
   const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
 
   test('lista os pedidos com o nome do animal, mais recentes primeiro', async () => {
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor', name: 'Primeira Pessoa' } })
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel', name: 'Segunda Pessoa' } })
+    await adopt({ ...validAdoption, petId: 'thor', name: 'Primeira Pessoa' })
+    await adopt({ ...validAdoption, petId: 'mel', name: 'Segunda Pessoa' })
 
     const { status, data } = await api('/api/adoptions', { headers: admin })
     assert.equal(status, 200)
@@ -434,8 +449,8 @@ describe('listagem de pedidos de adoção (GET /api/adoptions)', { skip }, () =>
   })
 
   test('filtra por animal e por status', async () => {
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' } })
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel' } })
+    await adopt({ ...validAdoption, petId: 'thor' })
+    await adopt({ ...validAdoption, petId: 'mel' })
 
     const { data: doThor } = await api('/api/adoptions?petId=thor', { headers: admin })
     assert.deepEqual(doThor.map((request) => request.petId), ['thor'])
@@ -592,8 +607,6 @@ describe('meus pedidos (GET /api/adoptions/mine)', { skip }, () => {
 
     await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'thor' }, headers: ana })
     await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'mel' }, headers: bia })
-    // Pedido feito sem estar logado: não pertence a ninguém.
-    await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'nino' } })
 
     const { status, data } = await api('/api/adoptions/mine', { headers: ana })
     assert.equal(status, 200)
@@ -606,18 +619,33 @@ describe('meus pedidos (GET /api/adoptions/mine)', { skip }, () => {
     assert.deepEqual(daBia.map((request) => request.petId), ['mel'])
   })
 
-  test('pedido sem login continua funcionando e fica sem conta', async () => {
-    const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
+  test('pedido sem login devolve 401, não cria o pedido e não mexe no pet', async () => {
+    const semLogin = await api('/api/adoptions', { method: 'POST', body: validAdoption })
+    assert.equal(semLogin.status, 401)
+    assert.match(semLogin.data.message, /Entre na sua conta/)
+    const cookieInventado = await adopt(validAdoption, { Cookie: 'adopet_session=inventado' })
+    assert.equal(cookieInventado.status, 401)
+
+    const { rows: [{ total }] } = await db.query('SELECT COUNT(*)::int AS total FROM adoption_requests')
+    assert.equal(total, 0)
+    assert.equal((await api('/api/pets/thor')).data.status, 'available')
+  })
+
+  test('o pedido fica ligado à conta logada', async () => {
+    const { status, data } = await adopt(validAdoption)
     assert.equal(status, 201)
-    const { rows: [saved] } = await db.query('SELECT user_id FROM adoption_requests WHERE id = $1', [data.id])
-    assert.equal(saved.user_id, null)
+    const { rows: [saved] } = await db.query(
+      'SELECT u.email FROM adoption_requests r JOIN users u ON u.id = r.user_id WHERE r.id = $1',
+      [data.id]
+    )
+    assert.equal(saved.email, 'adotante@exemplo.com')
   })
 })
 
 describe('aprovar ou recusar pedidos (PATCH /api/adoptions/:id)', { skip }, () => {
   const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
   const newRequest = async (petId, name = 'Pessoa') =>
-    (await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId, name } })).data.id
+    (await adopt({ ...validAdoption, petId, name })).data.id
   const decide = (id, status, headers = admin) => api(`/api/adoptions/${id}`, { method: 'PATCH', body: { status }, headers })
   const statusOf = async (id) => (await db.query('SELECT status FROM adoption_requests WHERE id = $1', [id])).rows[0].status
   const petStatus = async (id) => (await api(`/api/pets/${id}`)).data.status
@@ -862,7 +890,7 @@ describe('editar e encerrar campanha (PUT e PATCH /api/campaigns/:id)', { skip }
 
 describe('pedidos de adoção', { skip }, () => {
   test('cria o pedido e deixa o pet "Em processo"', async () => {
-    const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
+    const { status, data } = await adopt(validAdoption)
     assert.equal(status, 201)
     assert.equal(data.petId, 'thor')
     assert.equal(data.status, 'received')
@@ -876,23 +904,23 @@ describe('pedidos de adoção', { skip }, () => {
   })
 
   test('aceita pedido para pet já em processo', async () => {
-    const { status } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'pipoca' } })
+    const { status } = await adopt({ ...validAdoption, petId: 'pipoca' })
     assert.equal(status, 201)
   })
 
   test('recusa pedido para pet já adotado', async () => {
-    const { status, data } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'luna' } })
+    const { status, data } = await adopt({ ...validAdoption, petId: 'luna' })
     assert.equal(status, 409)
     assert.match(data.message, /Luna/)
   })
 
   test('pet inexistente devolve 404', async () => {
-    const { status } = await api('/api/adoptions', { method: 'POST', body: { ...validAdoption, petId: 'xyz' } })
+    const { status } = await adopt({ ...validAdoption, petId: 'xyz' })
     assert.equal(status, 404)
   })
 
   test('devolve os erros de cada campo', async () => {
-    const { status, data } = await api('/api/adoptions', { method: 'POST', body: { petId: 'thor', agreeVisit: false } })
+    const { status, data } = await adopt({ petId: 'thor', agreeVisit: false })
     assert.equal(status, 422)
     assert.deepEqual(
       Object.keys(data.errors).sort(),
@@ -901,7 +929,7 @@ describe('pedidos de adoção', { skip }, () => {
   })
 
   test('JSON inválido devolve 400', async () => {
-    const { status } = await api('/api/adoptions', { method: 'POST', body: '{nao é json' })
+    const { status } = await adopt('{nao é json')
     assert.equal(status, 400)
   })
 
@@ -909,16 +937,13 @@ describe('pedidos de adoção', { skip }, () => {
     const { status } = await api('/api/adoptions', {
       method: 'POST',
       body: 'x',
-      headers: { 'Content-Type': 'text/plain' }
+      headers: { ...(await adopterHeaders()), 'Content-Type': 'text/plain' }
     })
     assert.equal(status, 415)
   })
 
   test('corpo acima do limite devolve 413', async () => {
-    const { status } = await api('/api/adoptions', {
-      method: 'POST',
-      body: { ...validAdoption, message: 'a'.repeat(200_000) }
-    })
+    const { status } = await adopt({ ...validAdoption, message: 'a'.repeat(200_000) })
     assert.equal(status, 413)
   })
 })

@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Icon } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 import { useAsync } from '../hooks/useAsync'
 import { getPet } from '../services/petsService'
 import NotFound from './NotFound'
@@ -9,6 +10,7 @@ import NotFound from './NotFound'
 export default function PetProfile() {
   const { id } = useParams()
   const { data: pet, loading, error, reload } = useAsync(() => getPet(id), [id])
+  const { user } = useAuth()
 
   if (loading) return <LoadingState />
   if (error?.status === 404) return <NotFound />
@@ -56,9 +58,16 @@ export default function PetProfile() {
             {reserved && <Alert tone="warning" title="Adoção em andamento">Já existe um pedido em análise para {pet.name}, mas você ainda pode enviar o seu.</Alert>}
 
             {!adopted && (
-              <div className="row">
-                <Button size="lg" to={`/pets/${pet.id}/adotar`}>Quero adotar</Button>
-                <Button size="lg" variant="secondary" icon="calendar" to={`/pets/${pet.id}/adotar?visita=1`}>Agendar visita</Button>
+              <div className="stack" style={{ gap: 8 }}>
+                <div className="row">
+                  <Button size="lg" to={`/pets/${pet.id}/adotar`}>Quero adotar</Button>
+                  <Button size="lg" variant="secondary" icon="calendar" to={`/pets/${pet.id}/adotar?visita=1`}>Agendar visita</Button>
+                </div>
+                {!user && (
+                  <p className="t-body-sm t-muted" style={{ margin: 0 }}>
+                    Para pedir a adoção é preciso entrar na sua conta.
+                  </p>
+                )}
               </div>
             )}
           </div>

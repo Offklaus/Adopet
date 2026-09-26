@@ -52,8 +52,11 @@ export default function AdoptionForm() {
   const [values, setValues] = useState(INITIAL)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | sending | sent | failed
-  const { user } = useAuth()
+  const [sendError, setSendError] = useState(null)
+  const { user, loading: authLoading } = useAuth()
   const location = useLocation()
+  // Depois de entrar (ou criar a conta), a pessoa volta para este formulário.
+  const back = encodeURIComponent(location.pathname + location.search)
 
   // Logado: nome e e-mail da conta já preenchidos (sem apagar o que a pessoa digitou).
   useEffect(() => {
@@ -61,7 +64,7 @@ export default function AdoptionForm() {
     setValues((current) => ({ ...current, name: current.name || user.name, email: current.email || user.email }))
   }, [user])
 
-  if (pet.loading) return <LoadingState />
+  if (pet.loading || authLoading) return <LoadingState />
   if (pet.error?.status === 404) return <NotFound />
   if (pet.error) {
     return (
@@ -72,6 +75,28 @@ export default function AdoptionForm() {
   }
 
   const name = pet.data.name
+
+  // Pedir adoção exige conta logada (a API também confere: 401).
+  if (!user) {
+    return (
+      <section className="section section--tight">
+        <div className="form-card auth-card">
+          <h1 className="t-heading-lg">Entre para adotar {name}</h1>
+          <p className="t-muted" style={{ margin: 0 }}>
+            Para pedir uma adoção você precisa estar com a conta logada. Assim a ONG sabe quem pediu e você acompanha
+            a resposta em Meus pedidos.
+          </p>
+          <div className="row">
+            <Button to={`/entrar?voltar=${back}`}>Entrar</Button>
+            <Button variant="outline" to={`/entrar?modo=cadastro&voltar=${back}`}>Criar conta</Button>
+          </div>
+          <div>
+            <Button variant="ghost" icon="arrow-left" to={`/pets/${id}`}>Voltar para {name}</Button>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   function setField(field) {
     return (event) => {
@@ -95,10 +120,12 @@ export default function AdoptionForm() {
     if (Object.keys(stepErrors).length > 0) return
 
     setStatus('sending')
+    setSendError(null)
     try {
       await createAdoptionRequest({ petId: id, ...values })
       setStatus('sent')
-    } catch {
+    } catch (error) {
+      setSendError(error)
       setStatus('failed')
     }
   }
@@ -111,7 +138,7 @@ export default function AdoptionForm() {
             Recebemos seu pedido para adotar {name}. A ONG vai entrar em contato por e-mail em até 3 dias úteis para agendar a visita.
           </Alert>
           <div className="row">
-            {user && <Button to="/meus-pedidos">Ver meus pedidos</Button>}
+            <Button to="/meus-pedidos">Ver meus pedidos</Button>
             <Button to="/adotar" variant="outline">Ver outros pets</Button>
           </div>
         </div>
@@ -125,12 +152,6 @@ export default function AdoptionForm() {
         <div className="stack">
           <h1 className="t-heading-lg">Pedido para adotar {name}</h1>
           {wantsVisit && <p className="t-muted">Depois do pedido, a ONG combina a data da visita com você.</p>}
-          {!user && (
-            <p className="t-body-sm t-muted" style={{ margin: 0 }}>
-              <Link to={`/entrar?voltar=${encodeURIComponent(location.pathname + location.search)}`}>Entre na sua conta</Link>{' '}
-              para acompanhar este pedido em Meus pedidos.
-            </p>
-          )}
         </div>
 
         <Stepper steps={STEPS} current={step} />
@@ -170,7 +191,15 @@ export default function AdoptionForm() {
             />
             {errors.agreeVisit && <p className="ap-field__hint" style={{ color: 'var(--danger)' }}>{errors.agreeVisit}</p>}
             {status === 'failed' && (
-              <Alert tone="danger" title="Não foi possível enviar">Verifique sua conexão e tente de novo.</Alert>
+              sendError?.status === 401 ? (
+                <Alert tone="danger" title="Sua sessão terminou">
+                  <Link to={`/entrar?voltar=${back}`}>Entre de novo</Link> para enviar o pedido.
+                </Alert>
+              ) : (
+                <Alert tone="danger" title="Não foi possível enviar">
+                  {sendError?.status === 409 ? sendError.message : 'Verifique sua conexão e tente de novo.'}
+                </Alert>
+              )
             )}
           </div>
         )}
