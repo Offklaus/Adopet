@@ -9,6 +9,7 @@ const PATHS = {
   alert: 'M12 3l9.5 17h-19L12 3zM12 10v4M12 17h.01',
   x: 'M6 6l12 12M18 6L6 18',
   upload: 'M12 15V4M7 9l5-5 5 5M4 15v5h16v-5',
+  chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
   'arrow-right': 'M5 12h14M13 6l6 6-6 6',
   'arrow-left': 'M19 12H5M11 6l-6 6 6 6',
   home: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z',

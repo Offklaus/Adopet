@@ -4,6 +4,7 @@ import { AdminNav } from '../components/admin/AdminNav'
 import { LoadingState } from '../components/feedback/LoadingState'
 import { Alert, Badge, Button, Chip, Icon, TextField } from '../components/ui'
 import { decideAdoptionRequest, listAdoptionRequests } from '../services/adoptionsService'
+import { adoptionDecisionLink } from '../utils/whatsapp'
 
 const STATUS = {
   received: { tone: 'primary', label: 'Recebido' },
@@ -81,6 +82,26 @@ function DecisionActions({ request, otherOpen, onDecide }) {
   )
 }
 
+/**
+ * Abre o WhatsApp do administrador na conversa com quem pediu, com a mensagem da decisão já escrita
+ * (aprovado ou recusado). O envio é feito por ele, no WhatsApp.
+ */
+function WhatsAppButton({ request, size = 'sm' }) {
+  return (
+    <Button
+      variant="outline"
+      size={size}
+      icon="chat"
+      href={adoptionDecisionLink(request)}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Avisar ${request.name} no WhatsApp (abre em outra aba)`}
+    >
+      Avisar no WhatsApp
+    </Button>
+  )
+}
+
 function RequestCard({ request, otherOpen, onDecide }) {
   const status = STATUS[request.status]
   return (
@@ -113,8 +134,12 @@ function RequestCard({ request, otherOpen, onDecide }) {
 
       {request.message && <p className="request-card__message">{request.message}</p>}
 
-      {request.status === 'received' && (
+      {request.status === 'received' ? (
         <DecisionActions request={request} otherOpen={otherOpen} onDecide={onDecide} />
+      ) : (
+        <div className="request-card__actions">
+          <WhatsAppButton request={request} />
+        </div>
       )}
     </li>
   )
@@ -157,7 +182,10 @@ export default function AdminAdoptions() {
       const result = await decideAdoptionRequest(request.id, status)
       const details = []
       if (result.autoRejected > 0) {
-        details.push(`${result.autoRejected} outro(s) pedido(s) para ${result.pet.name} foram recusados.`)
+        details.push(
+          `${result.autoRejected} outro(s) pedido(s) para ${result.pet.name} foram recusados; ` +
+          'cada um tem o botão "Avisar no WhatsApp" na lista.'
+        )
       }
       if (status === 'rejected' && result.pet.status === 'available') {
         details.push(`${result.pet.name} voltou a aparecer como disponível para adoção.`)
@@ -167,7 +195,9 @@ export default function AdminAdoptions() {
         title: status === 'approved'
           ? `Pedido aprovado: ${result.pet.name} foi adotado por ${request.name}`
           : `Pedido de ${request.name} recusado`,
-        text: details.join(' ')
+        text: details.join(' '),
+        // O pedido já com a decisão: o aviso oferece mandar a mensagem para esta pessoa.
+        decided: { ...request, status }
       })
       await load()
       return true
@@ -230,7 +260,17 @@ export default function AdminAdoptions() {
         </div>
 
         {error && <Alert tone="danger" title={error.title}>{error.text}</Alert>}
-        {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text || null}</Alert>}
+        {notice && (
+          <div className="stack" style={{ gap: 8 }}>
+            <Alert tone={notice.tone} title={notice.title}>{notice.text || null}</Alert>
+            {notice.decided && (
+              <div className="row">
+                <WhatsAppButton request={notice.decided} size="md" />
+                <span className="t-body-sm t-muted">Abre o seu WhatsApp com a mensagem pronta para {notice.decided.name}.</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading && !requests && <LoadingState label="Buscando pedidos…" />}
 
