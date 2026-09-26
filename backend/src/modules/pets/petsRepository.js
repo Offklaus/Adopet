@@ -1,18 +1,6 @@
-import { randomBytes } from 'node:crypto'
+import { makeId } from '../../lib/slug.js'
 
 const escapeLike = (text) => text.replace(/[\\%_]/g, (char) => `\\${char}`)
-
-/** "Pé de Pano" → "pe-de-pano-3f9a1c": legível na URL e sem colisão. */
-function makeId(name) {
-  const slug = name
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-  return `${slug || 'pet'}-${randomBytes(3).toString('hex')}`
-}
 
 function toPet(row) {
   if (!row) return null
@@ -81,7 +69,7 @@ export function createPetsRepository(db) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          RETURNING *`,
         [
-          makeId(pet.name), pet.name, pet.species, pet.age, pet.sex, pet.size, pet.tags, pet.status,
+          makeId(pet.name, 'pet'), pet.name, pet.species, pet.age, pet.sex, pet.size, pet.tags, pet.status,
           pet.photo, pet.photoAlt, pet.story, pet.street, pet.neighborhood, pet.city, pet.state,
           pet.latitude, pet.longitude
         ]

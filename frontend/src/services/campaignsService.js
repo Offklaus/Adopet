@@ -4,6 +4,14 @@ export async function listCampaigns() {
   return request('/campaigns')
 }
 
+/**
+ * Cria uma campanha (administração): { title, description, tag?, goal: reais inteiros }.
+ * Ela já aparece na página Doar, ativa e com a meta zerada.
+ */
+export async function createCampaign(data) {
+  return request('/campaigns', { method: 'POST', body: data })
+}
+
 /** Doações registradas, com o nome da campanha (administração: só para o administrador logado). */
 export async function listDonations() {
   return request('/donations')

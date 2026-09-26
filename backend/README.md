@@ -67,6 +67,7 @@ backend/
 │   ├── lib/auth.js          exige a chave de administrador nas rotas de cadastro
 │   ├── lib/password.js      hash scrypt das senhas
 │   ├── lib/cookies.js       leitura e escrita de cookies
+│   ├── lib/slug.js          id legível a partir do nome (pets e campanhas)
 │   ├── lib/google.js        verificação do token do "Entrar com o Google"
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
 │       ├── auth/            contas, login, Google e sessões
@@ -95,6 +96,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | POST | `/api/photos` | Envia a foto de um animal (**administração**). Corpo = o arquivo, com `Content-Type: image/jpeg`, `image/png` ou `image/webp`, até 5 MB. O tipo é conferido pelos bytes do arquivo. Responde `{ id, url }`: a `url` (`/api/photos/<id>`) vai no campo `photo` do animal | 201, 400, 401, 403, 413, 415 |
 | GET | `/api/photos/:id` | A imagem em si, com cache longo (uma foto nunca muda: trocar gera outro id) | 200, 404 |
 | GET | `/api/campaigns` | Campanhas ativas | 200 |
+| POST | `/api/campaigns` | Cria uma campanha (**administração**): `{ title (até 80), description (até 300), tag? (até 30), goal: reais inteiros de 1 a 10.000.000 }`. Começa ativa, com `raised` e `supporters` em 0; o `id` sai do título (ex.: `cirurgia-do-thor-3f9a1c`) | 201, 401, 403, 422 |
 | GET | `/api/donations?status=pending\|paid\|canceled&campaignId=<id>\|livre` | Doações com o nome da campanha, mais recentes primeiro (**administração**) | 200, 400, 401, 403 |
 | PATCH | `/api/donations/:id` | (**administração**) `{ status: "paid" }` confirma o pagamento de uma doação pendente: o valor entra em `raised` da campanha e conta um apoiador. `{ status: "canceled" }` cancela uma pendente (nada muda na meta) ou uma paga (estorno: o valor e o apoiador saem da meta, sem ficar negativo). Cancelada é definitiva. Responde `{ donation: { ..., previousStatus }, campaign }` | 200, 401, 403, 404, 409, 422 |
 | POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
@@ -105,7 +107,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 
 ### Administrador
 
-As rotas marcadas como **administração** (cadastrar, editar e excluir animais; ver, aprovar e recusar pedidos) só respondem para:
+As rotas marcadas como **administração** (cadastrar, editar e excluir animais; ver, aprovar e recusar pedidos; criar campanhas; ver e atualizar doações) só respondem para:
 - **o administrador logado no site:** conta ligada ao Google cujo e-mail está em `ADMIN_EMAILS`; ou
 - **quem envia a chave** `Authorization: Bearer <ADMIN_API_KEY>`, para uso fora do site.
 

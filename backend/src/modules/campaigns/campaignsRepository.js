@@ -1,3 +1,5 @@
+import { makeId } from '../../lib/slug.js'
+
 function toCampaign(row) {
   if (!row) return null
   return {
@@ -8,12 +10,24 @@ function toCampaign(row) {
     raised: row.raised,
     goal: row.goal,
     supporters: row.supporters,
+    active: row.active,
     createdAt: row.created_at
   }
 }
 
 export function createCampaignsRepository(db) {
   return {
+    /** Nova campanha: começa ativa, sem nada arrecadado e sem apoiadores. */
+    async create({ title, description, tag, goal }) {
+      const { rows } = await db.query(
+        `INSERT INTO campaigns (id, title, description, tag, goal)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [makeId(title, 'campanha'), title, description, tag, goal]
+      )
+      return toCampaign(rows[0])
+    },
+
     /** Campanhas ativas, a mais recente primeiro (a home destaca a primeira). */
     async listActive() {
       const { rows } = await db.query('SELECT * FROM campaigns WHERE active ORDER BY created_at DESC')

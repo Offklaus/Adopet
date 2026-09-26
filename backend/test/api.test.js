@@ -713,6 +713,74 @@ describe('campanhas e doações', { skip }, () => {
   })
 })
 
+describe('criar campanha (POST /api/campaigns)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const validCampaign = {
+    title: '  Cirurgia do Thor  ',
+    description: 'Cirurgia na pata traseira e remédios para a recuperação.',
+    tag: 'Urgente',
+    goal: 3500
+  }
+
+  test('cria ativa e zerada, com id a partir do título, e ela aparece primeiro na lista', async () => {
+    const { status, data } = await api('/api/campaigns', { method: 'POST', body: validCampaign, headers: admin })
+    assert.equal(status, 201)
+    assert.match(data.id, /^cirurgia-do-thor-[0-9a-f]{6}$/)
+    assert.equal(data.title, 'Cirurgia do Thor')
+    assert.equal(data.tag, 'Urgente')
+    assert.equal(data.goal, 3500)
+    assert.equal(data.raised, 0)
+    assert.equal(data.supporters, 0)
+    assert.equal(data.active, true)
+
+    const { data: lista } = await api('/api/campaigns')
+    assert.equal(lista[0].id, data.id)
+  })
+
+  test('etiqueta é opcional; vazia vira null', async () => {
+    const { status, data } = await api('/api/campaigns', {
+      method: 'POST',
+      body: { ...validCampaign, tag: '  ' },
+      headers: admin
+    })
+    assert.equal(status, 201)
+    assert.equal(data.tag, null)
+  })
+
+  test('a campanha nova já recebe doações e a meta anda quando a doação é paga', async () => {
+    const { data: campaign } = await api('/api/campaigns', { method: 'POST', body: validCampaign, headers: admin })
+    const { data: donation } = await api('/api/donations', {
+      method: 'POST',
+      body: { campaignId: campaign.id, amount: 200 }
+    })
+    const { data } = await api(`/api/donations/${donation.id}`, { method: 'PATCH', body: { status: 'paid' }, headers: admin })
+    assert.equal(data.campaign.raised, 200)
+    assert.equal(data.campaign.supporters, 1)
+  })
+
+  test('devolve os erros de cada campo', async () => {
+    const { status, data } = await api('/api/campaigns', {
+      method: 'POST',
+      body: { title: '', description: 'x'.repeat(301), tag: 'y'.repeat(31), goal: 10.5 },
+      headers: admin
+    })
+    assert.equal(status, 422)
+    assert.deepEqual(Object.keys(data.errors).sort(), ['description', 'goal', 'tag', 'title'])
+
+    for (const goal of [0, -1, '1000', 10_000_001]) {
+      const { status: invalid } = await api('/api/campaigns', { method: 'POST', body: { ...validCampaign, goal }, headers: admin })
+      assert.equal(invalid, 422, `meta ${goal}`)
+    }
+  })
+
+  test('sem login devolve 401 e não cria nada', async () => {
+    const { status } = await api('/api/campaigns', { method: 'POST', body: validCampaign })
+    assert.equal(status, 401)
+    const { data: lista } = await api('/api/campaigns')
+    assert.equal(lista.length, 3)
+  })
+})
+
 describe('pedidos de adoção', { skip }, () => {
   test('cria o pedido e deixa o pet "Em processo"', async () => {
     const { status, data } = await api('/api/adoptions', { method: 'POST', body: validAdoption })
