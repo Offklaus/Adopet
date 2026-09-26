@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { uploadPetPhoto } from '../../services/petsService'
-import { Alert, Button, Chip, TextField } from '../ui'
+import { Alert, Button, Chip, Icon, TextField } from '../ui'
 
 const MAX_TAGS = 5
 // Mesmas regras do POST /api/photos (photosRoutes.js).
@@ -169,6 +169,33 @@ function toPayload(values) {
   }
 }
 
+/**
+ * Foto com legenda. Sem foto, ou com link quebrado, mostra a pata no lugar.
+ * O `key` pelo endereço zera o "quebrado" quando a foto muda.
+ */
+function PhotoPreview({ src, caption, alt }) {
+  return (
+    <figure className="photo-figure">
+      <figcaption>{caption}</figcaption>
+      <PhotoImage key={src} src={src} alt={alt} />
+    </figure>
+  )
+}
+
+function PhotoImage({ src, alt }) {
+  const [broken, setBroken] = useState(false)
+  const valid = src && (isHttpUrl(src) || isUploadedPhoto(src))
+  if (!valid || broken) {
+    return (
+      <div className="photo-preview photo-preview--empty">
+        <Icon name="paw" size={32} />
+        <span>{src ? 'Não foi possível carregar' : 'Sem foto'}</span>
+      </div>
+    )
+  }
+  return <img className="photo-preview" src={src} alt={alt} onError={() => setBroken(true)} />
+}
+
 /** 401 = sessão terminou; 403 = conta sem permissão de administrador. */
 function sessionProblem(error) {
   if (error.status === 401) {
@@ -203,7 +230,6 @@ export function PetForm({
   const [errors, setErrors] = useState({})
   const [sending, setSending] = useState(false)
   const [feedback, setFeedback] = useState(null)
-  const [photoBroken, setPhotoBroken] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInput = useRef(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -214,7 +240,6 @@ export function PetForm({
   function setField(field) {
     return (event) => {
       const { value } = event.target
-      if (field === 'photo') setPhotoBroken(false)
       setValues((current) => ({ ...current, [field]: value }))
     }
   }
@@ -228,7 +253,6 @@ export function PetForm({
   }
 
   function setPhoto(photo, error) {
-    setPhotoBroken(false)
     setValues((current) => ({ ...current, photo }))
     setErrors((current) => ({ ...current, photo: error }))
   }
@@ -329,7 +353,10 @@ export function PetForm({
 
   const photoUrl = values.photo.trim()
   const uploaded = isUploadedPhoto(photoUrl)
-  const showPreview = (uploaded || isHttpUrl(photoUrl)) && !photoBroken
+  // Na edição, a foto salva fica visível até a nova ser salva.
+  const editing = Boolean(initialPet)
+  const savedPhoto = baseline.photo.trim()
+  const photoChanged = photoUrl !== savedPhoto
 
   return (
     <section className="section section--tight">
@@ -399,8 +426,28 @@ export function PetForm({
 
         <fieldset className="form-section">
           <legend className="t-heading-sm">Foto</legend>
-          {showPreview && (
-            <img className="photo-preview" src={photoUrl} alt="Prévia da foto" onError={() => setPhotoBroken(true)} />
+          {editing ? (
+            <>
+              <div className="photo-compare">
+                <PhotoPreview src={savedPhoto} caption="Foto atual" alt={`Foto atual de ${baseline.name}`} />
+                {photoChanged && (
+                  <>
+                    <Icon name="arrow-right" size={24} />
+                    <PhotoPreview src={photoUrl} caption="Nova foto" alt="Prévia da nova foto" />
+                  </>
+                )}
+              </div>
+              {photoChanged && (
+                <div className="row">
+                  <span className="t-body-sm t-muted">A foto atual só é substituída quando você salvar as alterações.</span>
+                  <Button variant="ghost" size="sm" onClick={() => setPhoto(baseline.photo, undefined)} disabled={uploading}>
+                    Manter a foto atual
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            photoUrl && <PhotoPreview src={photoUrl} caption="Prévia" alt="Prévia da foto" />
           )}
           <div className="stack" style={{ gap: 8 }}>
             <input
@@ -422,7 +469,7 @@ export function PetForm({
             </div>
             <p className="ap-field__hint" style={errors.photo && uploaded ? { color: 'var(--danger)' } : undefined}>
               {(uploaded && errors.photo) ||
-                (uploaded ? 'Foto enviada. Ela é salva junto com o cadastro.' : `JPG, PNG ou WebP, até ${MAX_PHOTO_MB} MB.`)}
+                (uploaded && photoChanged ? 'Foto enviada. Ela é salva junto com o cadastro.' : `JPG, PNG ou WebP, até ${MAX_PHOTO_MB} MB.`)}
             </p>
           </div>
           {!uploaded && (
