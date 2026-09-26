@@ -44,7 +44,7 @@ export default function Adopt() {
         </div>
 
         <div className="stack">
-          <form className="hero__search" onSubmit={handleSearch} role="search">
+          <form className="search-form" onSubmit={handleSearch} role="search">
             <TextField
               label="Buscar por nome ou cidade"
               icon="search"

@@ -61,7 +61,7 @@ export default function PetProfile() {
               <div className="stack" style={{ gap: 8 }}>
                 <div className="row">
                   <Button size="lg" to={`/pets/${pet.id}/adotar`}>Quero adotar</Button>
-                  <Button size="lg" variant="secondary" icon="calendar" to={`/pets/${pet.id}/adotar?visita=1`}>Agendar visita</Button>
+                  <Button size="lg" variant="outline" icon="calendar" to={`/pets/${pet.id}/adotar?visita=1`}>Agendar visita</Button>
                 </div>
                 {!user && (
                   <p className="t-body-sm t-muted" style={{ margin: 0 }}>

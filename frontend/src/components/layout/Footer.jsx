@@ -9,11 +9,11 @@ export function Footer() {
       <div className="container">
         <div className="footer__grid">
           <div className="stack" style={{ maxWidth: 360 }}>
-            <Link to="/" className="ap-nav__brand">
+            <Link to="/" className="ap-nav__brand footer__brand">
               <Icon name="paw" size={26} />
               <span>AdoPet</span>
             </Link>
-            <p className="t-body-sm t-muted">
+            <p className="t-body-sm footer__text">
               Conectamos cães e gatos que esperam por um lar a pessoas que querem adotar ou ajudar com doações.
             </p>
           </div>

@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DonationCard } from '../components/donations/DonationCard'
 import { PetGrid } from '../components/pets/PetGrid'
-import { Button, Chip, Icon, Stepper, TextField } from '../components/ui'
+import { Button, Chip, Hero, Stepper, TextField } from '../components/ui'
 import { useAsync } from '../hooks/useAsync'
 import { listCampaigns } from '../services/campaignsService'
 import { listPets } from '../services/petsService'
 
 const HOW_IT_WORKS = ['Escolha um pet', 'Envie o pedido', 'Agende a visita', 'Leve para casa']
+
+// Manchete no ritmo dos posts: linhas curtas, alternando branco e limão.
+const HEADLINE = ['Amor', { text: 'adotado,', accent: true }, 'amor', { text: 'redobrado.', accent: true }]
 
 export default function Home() {
   const navigate = useNavigate()
@@ -16,6 +19,8 @@ export default function Home() {
   const campaigns = useAsync(() => listCampaigns(), [])
 
   const featured = (pets.data ?? []).filter((pet) => pet.status !== 'adopted').slice(0, 3)
+  // A foto do Hero é a do primeiro pet em destaque que tiver foto; sem nenhuma, o Hero mostra a pata.
+  const heroPet = featured.find((pet) => pet.photo)
   const campaign = campaigns.data?.[0]
 
   function handleSearch(event) {
@@ -26,33 +31,44 @@ export default function Home() {
 
   return (
     <>
-      <section className="hero">
-        <div className="container hero__grid">
-          <div className="hero__copy">
-            <h1 className="t-display-xl">Um lar muda tudo</h1>
-            <p className="t-body-lg t-muted">
-              Cães e gatos resgatados esperam por uma família. Todos os nossos pets são vacinados e castrados antes da adoção.
-            </p>
-            <form className="hero__search" onSubmit={handleSearch} role="search">
-              <TextField
-                label="Buscar por nome ou cidade"
-                icon="search"
-                placeholder="Ex.: Thor, São Paulo"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <Button type="submit" size="lg">Buscar</Button>
-            </form>
-            <div className="row">
-              <Chip onClick={() => navigate('/adotar?especie=cao')}>Cães</Chip>
-              <Chip onClick={() => navigate('/adotar?especie=gato')}>Gatos</Chip>
-            </div>
-          </div>
-          <div className="hero__art" aria-hidden="true">
-            <Icon name="paw" size={200} />
+      <div className="container home-hero">
+        <Hero
+          label="Adote um pet"
+          eyebrow="Adoção responsável"
+          title={HEADLINE}
+          subtitle={
+            <>
+              Um novo <strong>lar</strong>, uma nova <strong>vida</strong>. Todos os nossos pets são vacinados e
+              castrados antes da adoção.
+            </>
+          }
+          actions={
+            <>
+              <Button variant="secondary" size="lg" to="/adotar" iconRight="arrow-right">Quero adotar</Button>
+              <Button variant="donate" size="lg" icon="heart" to="/doar">Doar</Button>
+            </>
+          }
+          image={heroPet?.photo}
+          imageAlt={heroPet ? heroPet.photoAlt || `Foto de ${heroPet.name}` : ''}
+        />
+
+        <div className="search-band">
+          <form className="search-form" onSubmit={handleSearch} role="search">
+            <TextField
+              label="Buscar por nome ou cidade"
+              icon="search"
+              placeholder="Ex.: Thor, São Paulo"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <Button type="submit" size="lg">Buscar</Button>
+          </form>
+          <div className="row">
+            <Chip onClick={() => navigate('/adotar?especie=cao')}>Cães</Chip>
+            <Chip onClick={() => navigate('/adotar?especie=gato')}>Gatos</Chip>
           </div>
         </div>
-      </section>
+      </div>
 
       <section className="section section--tight">
         <div className="container">
@@ -83,7 +99,7 @@ export default function Home() {
 
       {campaign && (
         <section className="section">
-          <div className="container hero__grid">
+          <div className="container split">
             <div className="stack">
               <h2 className="t-heading-lg">Não pode adotar agora?</h2>
               <p className="t-body-lg t-muted">
