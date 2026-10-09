@@ -5,8 +5,6 @@ import { Router } from './lib/router.js'
 import { registerAdoptionsRoutes } from './modules/adoptions/adoptionsRoutes.js'
 import { registerAuthRoutes } from './modules/auth/authRoutes.js'
 import { createCurrentUser } from './modules/auth/session.js'
-import { registerCampaignsRoutes } from './modules/campaigns/campaignsRoutes.js'
-import { registerDonationsRoutes } from './modules/donations/donationsRoutes.js'
 import { registerPetsRoutes } from './modules/pets/petsRoutes.js'
 import { registerPhotosRoutes } from './modules/photos/photosRoutes.js'
 
@@ -34,8 +32,6 @@ export function createApp({
 
   registerPetsRoutes(router, db, { requireAdmin })
   registerPhotosRoutes(router, db, { requireAdmin })
-  registerCampaignsRoutes(router, db, { requireAdmin })
-  registerDonationsRoutes(router, db, { requireAdmin })
   registerAdoptionsRoutes(router, db, { currentUser, requireAdmin })
   registerAuthRoutes(router, db, { googleClientId, cookieSecure, adminEmails, ...(verifyGoogle && { verifyGoogle }) })
 

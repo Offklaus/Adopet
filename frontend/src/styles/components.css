@@ -58,12 +58,6 @@ textarea.ap-field__control { height: auto; padding: var(--space-3) var(--space-4
 .ap-check__input:checked + .ap-check__box { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .ap-check__input:focus-visible + .ap-check__box { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* ProgressBar */
-.ap-progress { display: flex; align-items: center; gap: var(--space-3); }
-.ap-progress__track { flex: 1; height: 12px; border-radius: var(--radius-pill); background: var(--surface-sunken); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
-.ap-progress__fill { height: 100%; border-radius: var(--radius-pill); background: var(--donate); box-shadow: inset 0 0 0 1px rgba(5, 16, 72, .12); }
-.ap-progress__pct { font-size: 14px; font-weight: 800; color: var(--ink); min-width: 3ch; text-align: right; }
-
 /* PetCard */
 .ap-pet { background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; transition: box-shadow .2s, transform .2s; }
 .ap-pet:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
@@ -78,21 +72,6 @@ textarea.ap-field__control { height: auto; padding: var(--space-3) var(--space-4
 .ap-pet__name { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 32px; }
 .ap-pet__meta, .ap-pet__loc { margin: 0; font-size: 14px; line-height: 20px; color: var(--ink-muted); display: flex; align-items: center; gap: var(--space-1); }
 .ap-pet__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-2); }
-
-/* DonationCard */
-.ap-donate { box-sizing: border-box; background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
-.ap-donate > * { align-self: stretch; }
-.ap-donate > .ap-badge { align-self: flex-start; }
-.ap-donate__title { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 28px; }
-.ap-donate__desc { margin: 0; color: var(--ink-muted); font-size: 15px; line-height: 22px; }
-.ap-donate__goal { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); background: var(--surface-sunken); border-radius: var(--radius-md); }
-.ap-donate__nums, .ap-donate__sup { margin: 0; font-size: 14px; color: var(--ink-muted); }
-.ap-donate__nums strong { color: var(--ink); font-size: 18px; font-weight: 800; }
-.ap-donate__amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
-.ap-donate > .ap-btn { margin-top: auto; }
-.ap-amount { font: inherit; font-weight: 700; font-size: 15px; height: 44px; border-radius: var(--radius-sm); border: 1.5px solid var(--line-strong); background: var(--surface-raised); color: var(--ink); cursor: pointer; }
-.ap-amount:hover { background: var(--surface-sunken); }
-.ap-amount.is-selected { background: var(--donate-soft); border-color: var(--donate-strong); color: var(--donate-strong); }
 
 /* Alert */
 .ap-alert { display: flex; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-sm); }

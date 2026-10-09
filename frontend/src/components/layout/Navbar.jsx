@@ -7,8 +7,7 @@ import { Button, Icon } from '../ui'
 
 const LINKS = [
   { to: '/adotar', label: 'Adotar' },
-  { to: '/#como-funciona', label: 'Como funciona' },
-  { to: '/doar', label: 'Campanhas' }
+  { to: '/#como-funciona', label: 'Como funciona' }
 ]
 
 function linkClass({ isActive }) {
@@ -69,7 +68,7 @@ function AccountMenu({ user, onLogout }) {
   )
 }
 
-/** Cabeçalho: marca, links principais, tema e as ações "Doar" e "Quero adotar". */
+/** Cabeçalho: marca, links principais, tema, conta e a ação "Quero adotar". */
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
@@ -118,7 +117,6 @@ export function Navbar() {
           ) : (
             <Button variant="ghost" size="sm" to={loginHref} className="ap-nav__cta">Entrar</Button>
           )}
-          <Button variant="donate" size="sm" icon="heart" to="/doar" className="ap-nav__cta">Doar</Button>
           <Button variant="primary" size="sm" to="/adotar" className="ap-nav__cta">Quero adotar</Button>
           <button
             type="button"
@@ -135,7 +133,6 @@ export function Navbar() {
 
       <div id="menu-mobile" className={cx('ap-nav__mobile', menuOpen && 'is-open')}>
         <ul className="ap-nav__links" style={{ flexDirection: 'column' }}>{links}</ul>
-        <Button variant="donate" icon="heart" to="/doar" full>Doar</Button>
         <Button variant="primary" to="/adotar" full>Quero adotar</Button>
         {user ? (
           <>

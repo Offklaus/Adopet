@@ -1,10 +1,10 @@
 import { withTransaction } from '../../src/db/pool.js'
-import { seedCampaigns, seedPets } from './seedData.js'
+import { seedPets } from './seedData.js'
 
 /** Apaga tudo e recria os dados fixos. Use só no banco de testes. */
 export async function seed(pool) {
   await withTransaction(pool, async (client) => {
-    await client.query('TRUNCATE adoption_requests, donations, pets, pet_photos, campaigns, sessions, users')
+    await client.query('TRUNCATE adoption_requests, pets, pet_photos, sessions, users')
 
     for (const pet of seedPets) {
       await client.query(
@@ -16,17 +16,6 @@ export async function seed(pool) {
           pet.id, pet.name, pet.species, pet.age, pet.sex, pet.size, pet.tags, pet.status,
           pet.photo ?? null, pet.photoAlt ?? null, pet.story, pet.street ?? null, pet.neighborhood ?? null,
           pet.city, pet.state, pet.latitude ?? null, pet.longitude ?? null, pet.createdAt
-        ]
-      )
-    }
-
-    for (const campaign of seedCampaigns) {
-      await client.query(
-        `INSERT INTO campaigns (id, title, description, tag, raised, goal, supporters, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          campaign.id, campaign.title, campaign.description, campaign.tag,
-          campaign.raised, campaign.goal, campaign.supporters, campaign.createdAt
         ]
       )
     }

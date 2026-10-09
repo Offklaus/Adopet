@@ -3,9 +3,7 @@ import { cx } from '../../utils/cx'
 
 const ITEMS = [
   { to: '/admin/animais', label: 'Animais' },
-  { to: '/admin/pedidos', label: 'Pedidos de adoção' },
-  { to: '/admin/campanhas', label: 'Campanhas' },
-  { to: '/admin/doacoes', label: 'Doações' }
+  { to: '/admin/pedidos', label: 'Pedidos de adoção' }
 ]
 
 /** Abas da área administrativa, no topo de cada página dela. */

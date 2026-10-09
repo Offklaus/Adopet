@@ -67,14 +67,12 @@ backend/
 │   ├── lib/auth.js          exige a chave de administrador nas rotas de cadastro
 │   ├── lib/password.js      hash scrypt das senhas
 │   ├── lib/cookies.js       leitura e escrita de cookies
-│   ├── lib/slug.js          id legível a partir do nome (pets e campanhas)
+│   ├── lib/slug.js          id legível a partir do nome dos pets
 │   ├── lib/google.js        verificação do token do "Entrar com o Google"
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
 │       ├── auth/            contas, login, Google e sessões
 │       ├── pets/
 │       ├── photos/          fotos enviadas no cadastro (tabela pet_photos)
-│       ├── campaigns/
-│       ├── donations/
 │       └── adoptions/
 └── test/
     ├── api.test.js
@@ -95,14 +93,6 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
 | POST | `/api/photos` | Envia a foto de um animal (**administração**). Corpo = o arquivo, com `Content-Type: image/jpeg`, `image/png` ou `image/webp`, até 5 MB. O tipo é conferido pelos bytes do arquivo. Responde `{ id, url }`: a `url` (`/api/photos/<id>`) vai no campo `photo` do animal | 201, 400, 401, 403, 413, 415 |
 | GET | `/api/photos/:id` | A imagem em si, com cache longo (uma foto nunca muda: trocar gera outro id) | 200, 404 |
-| GET | `/api/campaigns` | Campanhas ativas. Com `?all=true` (**administração**): também as encerradas, depois das ativas | 200, 401, 403 |
-| GET | `/api/campaigns/:id` | Uma campanha, ativa ou encerrada (`active`, `endedAt`) | 200, 404 |
-| POST | `/api/campaigns` | Cria uma campanha (**administração**): `{ title (até 80), description (até 300), tag? (até 30), goal: reais inteiros de 1 a 10.000.000 }`. Começa ativa, com `raised` e `supporters` em 0; o `id` sai do título (ex.: `cirurgia-do-thor-3f9a1c`) | 201, 401, 403, 422 |
-| PUT | `/api/campaigns/:id` | Edita uma campanha ativa (**administração**). Mesmo corpo e validação do POST; `raised` e `supporters` não mudam. Encerrada: 409 | 200, 401, 403, 404, 409, 422 |
-| PATCH | `/api/campaigns/:id` | `{ active: false }` encerra a campanha (**administração**): sai da página Doar, recusa novas doações (404) e guarda `endedAt`. É definitivo (de novo: 409). Doações pendentes dela ainda podem ser pagas ou canceladas | 200, 401, 403, 404, 409, 422 |
-| GET | `/api/donations?status=pending\|paid\|canceled&campaignId=<id>\|livre` | Doações com o nome da campanha, mais recentes primeiro (**administração**) | 200, 400, 401, 403 |
-| PATCH | `/api/donations/:id` | (**administração**) `{ status: "paid" }` confirma o pagamento de uma doação pendente: o valor entra em `raised` da campanha e conta um apoiador. `{ status: "canceled" }` cancela uma pendente (nada muda na meta) ou uma paga (estorno: o valor e o apoiador saem da meta, sem ficar negativo). Cancelada é definitiva. Responde `{ donation: { ..., previousStatus }, campaign }` | 200, 401, 403, 404, 409, 422 |
-| POST | `/api/donations` | `{ campaignId: string \| null, amount: inteiro em reais }` | 201, 404, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | PATCH | `/api/adoptions/:id` | `{ status: "approved" \| "rejected" }`: aprova ou recusa um pedido recebido (**administração**). Responde `{ request, pet, autoRejected }` | 200, 401, 404, 409, 422 |
 | POST · DELETE | `/api/adoptions/:id/notified` | Marca (POST, com a data de agora) ou desmarca (DELETE) que o adotante foi avisado da decisão (**administração**). Só pedido aprovado ou recusado (em aberto: 409). Responde `{ id, status, notifiedAt }`; a lista traz `notifiedAt` em cada pedido | 200, 401, 403, 404, 409 |
@@ -111,7 +101,7 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 
 ### Administrador
 
-As rotas marcadas como **administração** (cadastrar, editar e excluir animais; ver, aprovar e recusar pedidos; criar, editar e encerrar campanhas; ver e atualizar doações) só respondem para:
+As rotas marcadas como **administração** (cadastrar, editar e excluir animais; ver, aprovar e recusar pedidos; marcar o aviso ao adotante) só respondem para:
 - **o administrador logado no site:** conta ligada ao Google cujo e-mail está em `ADMIN_EMAILS`; ou
 - **quem envia a chave** `Authorization: Bearer <ADMIN_API_KEY>`, para uso fora do site.
 
@@ -182,4 +172,4 @@ No Postman ou Insomnia: `POST http://localhost:3333/api/pets`, aba **Auth** → 
 - **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com DDD + número (10 ou 11 dígitos): "+55" e o "0" antes do DDD são aceitos e removidos (`normalizePhone`, em `src/lib/validate.js`). Só quem está logado pede adoção (sem login: 401): o pedido fica ligado à conta (`user_id`) e aparece em "Meus pedidos". Pedidos antigos, feitos antes dessa regra, podem estar sem conta.
 - **Decisão do pedido:** só pedidos `received` podem ser aprovados ou recusados (os outros respondem 409). **Aprovar** marca o pet como `adopted` e recusa os outros pedidos em aberto dele. **Recusar** o último pedido em aberto de um pet `reserved` devolve o pet para `available`. Tudo numa transação, com o pedido e o pet travados.
 - **Fotos enviadas:** ficam no banco (tabela `pet_photos`, coluna `bytea`). Um animal só aceita `/api/photos/<id>` de uma foto que existe (senão 422). Quando a foto de um animal é trocada ou o animal é excluído, a foto enviada que ficou sem uso é apagada.
-- **Doação:** fica `pending`. O valor só deve entrar em `raised` da campanha quando o pagamento for confirmado (ainda não há integração de pagamento).
+- **Sem dinheiro no sistema:** o site não tem campanhas, doações nem pagamentos. As tabelas `campaigns` e `donations` existiram até a migração `008_remove_campaigns_donations.sql`, que as removeu; as rotas `/api/campaigns` e `/api/donations` respondem 404.

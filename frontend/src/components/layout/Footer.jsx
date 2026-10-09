@@ -14,14 +14,13 @@ export function Footer() {
               <span>AdoPet</span>
             </Link>
             <p className="t-body-sm footer__text">
-              Conectamos cães e gatos que esperam por um lar a pessoas que querem adotar ou ajudar com doações.
+              Conectamos cães e gatos que esperam por um lar a pessoas que querem adotar.
             </p>
           </div>
           <nav aria-label="Rodapé">
             <ul className="footer__links">
               <li><Link to="/adotar">Adotar</Link></li>
               <li><Link to="/#como-funciona">Como funciona</Link></li>
-              <li><Link to="/doar">Doar</Link></li>
               {user?.isAdmin && <li><Link to="/admin">Área administrativa</Link></li>}
             </ul>
           </nav>

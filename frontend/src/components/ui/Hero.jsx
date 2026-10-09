@@ -6,8 +6,8 @@ const PAWS = [[4, 58, 150, -18], [26, 8, 110, 14], [44, 70, 90, -8], [70, 16, 17
 
 /**
  * Faixa azul de marca (a cara dos posts do Instagram). Um por página.
- * `title`: linhas; `{ text, accent: true }` pinta a linha em limão. Sobre o azul, use botões
- * `secondary` (adotar) e `donate` (doar): `primary` some no fundo.
+ * `title`: linhas; `{ text, accent: true }` pinta a linha em limão. Sobre o azul, use `secondary`
+ * na ação principal e `outline` na secundária: `primary` some no fundo.
  * `image`: foto (sem ela, uma pata); `false` remove a coluna.
  */
 export function Hero({ title = [], eyebrow, subtitle, actions, image, imageAlt = '', label, className, children }) {

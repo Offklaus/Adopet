@@ -38,21 +38,3 @@ export const seedPets = [
     city: 'Osasco', state: 'SP', createdAt: '2026-07-30T12:00:00Z'
   }
 ]
-
-export const seedCampaigns = [
-  {
-    id: 'inverno-2026', title: 'Campanha de inverno',
-    description: 'Cobertores, ração e vacinas para os 120 pets do abrigo passarem o frio bem cuidados.',
-    tag: 'Campanha ativa', raised: 6800, goal: 10000, supporters: 214, createdAt: '2026-09-01T12:00:00Z'
-  },
-  {
-    id: 'castracao', title: 'Mutirão de castração',
-    description: 'Castração gratuita para 80 cães e gatos de famílias da zona leste.',
-    tag: 'Saúde', raised: 3150, goal: 8000, supporters: 97, createdAt: '2026-08-15T12:00:00Z'
-  },
-  {
-    id: 'reforma-canil', title: 'Reforma do canil',
-    description: 'Novo piso e cobertura para os recintos dos cães de grande porte.',
-    tag: 'Estrutura', raised: 12400, goal: 15000, supporters: 331, createdAt: '2026-07-20T12:00:00Z'
-  }
-]
