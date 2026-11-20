@@ -2,6 +2,7 @@ import { createAdminGuard } from './lib/auth.js'
 import { applyCors } from './lib/cors.js'
 import { HttpError, sendBinary, sendJson } from './lib/http.js'
 import { Router } from './lib/router.js'
+import { createStaticSite } from './lib/static.js'
 import { registerAdoptionsRoutes } from './modules/adoptions/adoptionsRoutes.js'
 import { registerAuthRoutes } from './modules/auth/authRoutes.js'
 import { createCurrentUser } from './modules/auth/session.js'
@@ -22,9 +23,12 @@ export function createApp({
   cookieSecure = false,
   // Os testes trocam a verificação do Google por uma falsa (sem chamar o Google).
   verifyGoogle,
+  // Pasta do site compilado (frontend/dist). Em produção a API serve o site no mesmo endereço.
+  staticDir,
   log = console.log
 }) {
   const router = new Router()
+  const serveStatic = staticDir ? createStaticSite(staticDir) : null
   router.get('/api/health', () => ({ status: 200, body: { status: 'ok' } }))
   // Um único lugar decide quem está logado e quem é administrador; todas as rotas usam estes dois.
   const currentUser = createCurrentUser(db, { adminEmails })
@@ -52,6 +56,11 @@ export function createApp({
     }
 
     try {
+      // Tudo que não é /api é o site (páginas, scripts, imagens).
+      if (serveStatic && !url.pathname.startsWith('/api') && (req.method === 'GET' || req.method === 'HEAD')) {
+        await serveStatic(req, res, url.pathname)
+        return
+      }
       const { handler, params } = router.match(req.method, url.pathname)
       const { status, body, headers } = await handler({ req, params, query: url.searchParams })
       // Buffer = arquivo (foto); o resto vai como JSON.

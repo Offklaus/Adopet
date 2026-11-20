@@ -9,7 +9,10 @@ if (existsSync(envFile)) process.loadEnvFile(envFile)
 
 export const config = {
   port: Number(process.env.PORT ?? 3333),
-  host: process.env.HOST ?? 'localhost',
+  // No Render (que define RENDER=true) a API precisa escutar em todas as interfaces.
+  host: process.env.HOST ?? (process.env.RENDER ? '0.0.0.0' : 'localhost'),
+  // Site compilado servido pela API (npm run build na raiz gera frontend/dist).
+  staticDir: process.env.STATIC_DIR ?? resolve(ROOT_DIR, '..', 'frontend', 'dist'),
   databaseUrl: process.env.DATABASE_URL,
   testDatabaseUrl: process.env.TEST_DATABASE_URL,
   // Chave das rotas de administração (cadastro de animais). Vazia = rotas desligadas.
@@ -23,7 +26,7 @@ export const config = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || undefined,
   // "true" em produção (HTTPS): o cookie de sessão só trafega por conexão segura.
   cookieSecure: process.env.COOKIE_SECURE === 'true',
-  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5180')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)

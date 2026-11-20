@@ -68,6 +68,7 @@ backend/
 │   ├── lib/password.js      hash scrypt das senhas
 │   ├── lib/cookies.js       leitura e escrita de cookies
 │   ├── lib/slug.js          id legível a partir do nome dos pets
+│   ├── lib/static.js        serve o site compilado (frontend/dist) em produção, fora de /api
 │   ├── lib/google.js        verificação do token do "Entrar com o Google"
 │   └── modules/             um módulo por recurso: repository (SQL) + routes (HTTP)
 │       ├── auth/            contas, login, Google e sessões
@@ -129,7 +130,7 @@ Por que só contas do Google: contas com senha não confirmam o e-mail, então a
 1. Em https://console.cloud.google.com, crie (ou escolha) um projeto.
 2. Em **APIs e serviços → Tela de consentimento OAuth**, configure o app (tipo "Externo") e adicione seu e-mail como usuário de teste.
 3. Em **APIs e serviços → Credenciais → Criar credenciais → ID do cliente OAuth**, escolha **Aplicativo da Web**.
-4. Em **Origens JavaScript autorizadas**, adicione `http://localhost:5173` (e o endereço do site em produção, quando houver).
+4. Em **Origens JavaScript autorizadas**, adicione `http://localhost:5180` (e o endereço do site em produção, quando houver).
 5. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`) para `GOOGLE_CLIENT_ID` no `backend/.env` e reinicie a API.
 
 O ID do cliente não é segredo (ele aparece na página); o que não pode vazar é a "chave secreta do cliente", que este projeto não usa.

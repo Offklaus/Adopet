@@ -1,0 +1,12 @@
+{
+  "name": "adopet",
+  "private": true,
+  "description": "AdoPet: site de adoção de animais. Comandos de produção (Render): o backend serve a API e o site compilado no mesmo endereço.",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "build": "cd backend && npm ci && cd ../frontend && npm ci --include=dev && npm run build",
+    "start": "cd backend && npm start"
+  }
+}

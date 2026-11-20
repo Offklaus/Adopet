@@ -11,7 +11,7 @@ import { seed } from './fixtures/seed.js'
 // Os testes usam um banco próprio (TEST_DATABASE_URL), porque apagam os dados a cada teste.
 const skip = config.testDatabaseUrl ? false : 'defina TEST_DATABASE_URL no backend/.env'
 
-const ORIGIN = 'http://localhost:5173'
+const ORIGIN = 'http://localhost:5180'
 const ADMIN_KEY = 'chave-de-teste'
 let db
 let server

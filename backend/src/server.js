@@ -21,7 +21,8 @@ const server = createServer(createApp({
   adminApiKey: config.adminApiKey,
   adminEmails: config.adminEmails,
   googleClientId: config.googleClientId,
-  cookieSecure: config.cookieSecure
+  cookieSecure: config.cookieSecure,
+  staticDir: config.staticDir
 }))
 
 server.on('error', async (error) => {
