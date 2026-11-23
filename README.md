@@ -1,6 +1,6 @@
 # AdoPet
 
-Site de adoção de animais. Não há campanhas, doações nem pagamentos: nenhum dinheiro passa pelo sistema.
+Site de adoção de animais, com campanhas de arrecadação para a ONG. Nenhum dinheiro passa pelo sistema: o botão "Doar" abre o WhatsApp da ONG com a mensagem pronta ("Olá! Quero doar R$ 50 para a campanha …") e o pagamento é combinado direto com ela.
 
 ```
 Adopet/

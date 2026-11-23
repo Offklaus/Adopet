@@ -9,6 +9,7 @@ import {
   markAdoptionNotified,
   unmarkAdoptionNotified
 } from '../services/adoptionsService'
+import { formatPhone } from '../utils/phone'
 import { adoptionDecisionLink } from '../utils/whatsapp'
 
 const STATUS = {
@@ -33,13 +34,6 @@ const HOUSING = {
 }
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-
-/** "11912345678" → "(11) 91234-5678". */
-function formatPhone(digits) {
-  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
-  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
-  return digits
-}
 
 /**
  * Botões de decisão de um pedido recebido, com confirmação.

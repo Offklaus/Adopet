@@ -1,3 +1,5 @@
+import { formatBRL } from './formatBRL'
+
 /**
  * Aviso de decisão do pedido de adoção pelo WhatsApp, sem API: o link abre o WhatsApp
  * do administrador com a conversa do adotante e a mensagem já escrita; ele só aperta enviar.
@@ -28,4 +30,18 @@ export function adoptionDecisionMessage({ name, petName, status }) {
 /** Link pronto para avisar a pessoa de um pedido já decidido. */
 export function adoptionDecisionLink(request) {
   return whatsappLink(request.phone, adoptionDecisionMessage(request))
+}
+
+/**
+ * Doação sem pagamento pelo site: o botão "Doar" abre o WhatsApp da ONG da campanha
+ * com esta mensagem, e a pessoa combina o pagamento direto com a ONG.
+ */
+export function donationMessage({ title }, amount) {
+  // Intl põe espaço não separável depois do "R$"; na mensagem vai um espaço comum.
+  return `Olá! Quero doar ${formatBRL(amount).replace(/ /g, ' ')} para a campanha ${title}.`
+}
+
+/** Link para o WhatsApp da ONG (`campaign.whatsapp`) com a mensagem de doação já escrita. */
+export function donationLink(campaign, amount) {
+  return whatsappLink(campaign.whatsapp, donationMessage(campaign, amount))
 }

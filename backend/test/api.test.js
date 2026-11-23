@@ -101,13 +101,8 @@ describe('geral', { skip }, () => {
     assert.equal(data.message, 'Rota não encontrada.')
   })
 
-  test('campanhas e doações não existem mais: as rotas respondem 404', async () => {
-    for (const path of ['/api/campaigns', '/api/campaigns/castracao', '/api/donations']) {
-      const { status } = await api(path)
-      assert.equal(status, 404, path)
-    }
-    const { status } = await api('/api/donations', { method: 'POST', body: { campaignId: null, amount: 50 } })
-    assert.equal(status, 404)
+  test('doações não passam pelo site: /api/donations responde 404', async () => {
+    assert.equal((await api('/api/donations', { method: 'POST', body: { amount: 50 } })).status, 404)
   })
 
   test('método errado devolve 405', async () => {
@@ -897,5 +892,45 @@ describe('usuário administrador', { skip }, () => {
   test('sem login: 401; a chave ADMIN_API_KEY continua valendo fora do site', async () => {
     assert.equal((await api('/api/adoptions')).status, 401)
     assert.equal((await api('/api/adoptions', { headers: { Authorization: `Bearer ${ADMIN_KEY}` } })).status, 200)
+  })
+})
+
+describe('campanhas de arrecadação (doação pelo WhatsApp da ONG)', { skip }, () => {
+  const admin = { Authorization: `Bearer ${ADMIN_KEY}` }
+  const valid = { title: 'Cirurgia do Thor', description: 'Cirurgia e remédios.', tag: 'Urgente', goal: 3000, whatsapp: '+55 35 99999-8888' }
+  const create = (body = valid, headers = admin) => api('/api/campaigns', { method: 'POST', body, headers })
+
+  test('cria com o WhatsApp só com DDD + número e arrecadado começando em 0; aparece na lista pública', async () => {
+    const { status, data } = await create()
+    assert.equal(status, 201)
+    assert.match(data.id, /^cirurgia-do-thor-[0-9a-f]{6}$/)
+    assert.equal(data.whatsapp, '35999998888')
+    assert.equal(data.raised, 0)
+    assert.equal(data.active, true)
+    const { data: lista } = await api('/api/campaigns')
+    assert.deepEqual(lista.map((c) => [c.id, c.whatsapp]), [[data.id, '35999998888']])
+  })
+
+  test('valida os campos (422) e exige administrador (401)', async () => {
+    const { status, data } = await create({ title: '', description: '', goal: 0, raised: -1, whatsapp: '123' })
+    assert.equal(status, 422)
+    assert.deepEqual(Object.keys(data.errors).sort(), ['description', 'goal', 'raised', 'title', 'whatsapp'])
+    assert.equal((await create(valid, {})).status, 401)
+    assert.equal((await api('/api/campaigns?all=true')).status, 401)
+  })
+
+  test('o administrador atualiza o valor arrecadado; encerrar tira da lista pública e é definitivo', async () => {
+    const { data: campanha } = await create()
+    const { status, data } = await api(`/api/campaigns/${campanha.id}`, { method: 'PUT', headers: admin, body: { ...valid, raised: 1200 } })
+    assert.equal(status, 200)
+    assert.equal(data.raised, 1200)
+
+    const fim = await api(`/api/campaigns/${campanha.id}`, { method: 'PATCH', headers: admin, body: { active: false } })
+    assert.equal(fim.status, 200)
+    assert.ok(fim.data.endedAt)
+    assert.deepEqual((await api('/api/campaigns')).data, [])
+    assert.equal((await api('/api/campaigns?all=true', { headers: admin })).data.length, 1)
+    const denovo = await api(`/api/campaigns/${campanha.id}`, { method: 'PUT', headers: admin, body: valid })
+    assert.equal(denovo.status, 409)
   })
 })

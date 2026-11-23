@@ -74,6 +74,7 @@ backend/
 │       ├── auth/            contas, login, Google e sessões
 │       ├── pets/
 │       ├── photos/          fotos enviadas no cadastro (tabela pet_photos)
+│       ├── campaigns/       campanhas de arrecadação (doação pelo WhatsApp da ONG)
 │       └── adoptions/
 └── test/
     ├── api.test.js
@@ -94,6 +95,11 @@ Todas as respostas são JSON. Erros vêm como `{ "message": "..." }` e, em valid
 | DELETE | `/api/pets/:id` | Exclui um animal (**administração**). Recusado (409) se houver pedidos de adoção para ele: nesse caso, mude a situação para `adopted` | 200, 401, 404, 409, 503 |
 | POST | `/api/photos` | Envia a foto de um animal (**administração**). Corpo = o arquivo, com `Content-Type: image/jpeg`, `image/png` ou `image/webp`, até 5 MB. O tipo é conferido pelos bytes do arquivo. Responde `{ id, url }`: a `url` (`/api/photos/<id>`) vai no campo `photo` do animal | 201, 400, 401, 403, 413, 415 |
 | GET | `/api/photos/:id` | A imagem em si, com cache longo (uma foto nunca muda: trocar gera outro id) | 200, 404 |
+| GET | `/api/campaigns` | Campanhas ativas, mais recentes primeiro. Com `?all=true`: também as encerradas (**administração**) | 200, 401, 403 |
+| GET | `/api/campaigns/:id` | Uma campanha, ativa ou encerrada | 200, 404 |
+| POST | `/api/campaigns` | `{ title, description, tag?, goal, raised?, whatsapp }` (**administração**). Valores em reais inteiros; `raised` começa em 0; `whatsapp` aceita "(35) 99999-9999" ou "+55 35 …" e é salvo só com DDD + número | 201, 401, 403, 422 |
+| PUT | `/api/campaigns/:id` | Edita uma campanha ativa, inclusive o valor arrecadado (**administração**). Mesmo corpo do POST. Encerrada: 409 | 200, 401, 403, 404, 409, 422 |
+| PATCH | `/api/campaigns/:id` | `{ active: false }`: encerra a campanha (**administração**); ela sai da página Doar. Definitivo: encerrar de novo dá 409 | 200, 401, 403, 404, 409, 422 |
 | GET | `/api/adoptions?status=received\|approved\|rejected&petId=` | Lista os pedidos de adoção com nome e situação do animal, mais recentes primeiro (**administração**: tem dados pessoais) | 200, 400, 401, 503 |
 | PATCH | `/api/adoptions/:id` | `{ status: "approved" \| "rejected" }`: aprova ou recusa um pedido recebido (**administração**). Responde `{ request, pet, autoRejected }` | 200, 401, 404, 409, 422 |
 | POST · DELETE | `/api/adoptions/:id/notified` | Marca (POST, com a data de agora) ou desmarca (DELETE) que o adotante foi avisado da decisão (**administração**). Só pedido aprovado ou recusado (em aberto: 409). Responde `{ id, status, notifiedAt }`; a lista traz `notifiedAt` em cada pedido | 200, 401, 403, 404, 409 |
@@ -173,4 +179,4 @@ No Postman ou Insomnia: `POST http://localhost:3333/api/pets`, aba **Auth** → 
 - **Adoção:** o primeiro pedido muda o pet de `available` para `reserved` ("Em processo"). Pets `adopted` recusam pedidos (409). A linha do pet fica travada durante o pedido (`SELECT ... FOR UPDATE`), para dois pedidos simultâneos não se atrapalharem. E-mail é salvo em minúsculas e telefone só com DDD + número (10 ou 11 dígitos): "+55" e o "0" antes do DDD são aceitos e removidos (`normalizePhone`, em `src/lib/validate.js`). Só quem está logado pede adoção (sem login: 401): o pedido fica ligado à conta (`user_id`) e aparece em "Meus pedidos". Pedidos antigos, feitos antes dessa regra, podem estar sem conta.
 - **Decisão do pedido:** só pedidos `received` podem ser aprovados ou recusados (os outros respondem 409). **Aprovar** marca o pet como `adopted` e recusa os outros pedidos em aberto dele. **Recusar** o último pedido em aberto de um pet `reserved` devolve o pet para `available`. Tudo numa transação, com o pedido e o pet travados.
 - **Fotos enviadas:** ficam no banco (tabela `pet_photos`, coluna `bytea`). Um animal só aceita `/api/photos/<id>` de uma foto que existe (senão 422). Quando a foto de um animal é trocada ou o animal é excluído, a foto enviada que ficou sem uso é apagada.
-- **Sem dinheiro no sistema:** o site não tem campanhas, doações nem pagamentos. As tabelas `campaigns` e `donations` existiram até a migração `008_remove_campaigns_donations.sql`, que as removeu; as rotas `/api/campaigns` e `/api/donations` respondem 404.
+- **Campanhas sem dinheiro no sistema:** o site não recebe pagamentos. Cada campanha tem o WhatsApp da ONG responsável; o botão "Doar" da página Doar abre `wa.me` com a mensagem pronta ("Olá! Quero doar R$ 50 para a campanha Cirurgia do Thor.") e a pessoa combina o pagamento direto com a ONG. O administrador atualiza o valor arrecadado (`raised`) quando a ONG confirma o recebimento, e a barra de meta mostra esse valor. A tabela `campaigns` voltou na migração `009_campaigns_whatsapp.sql`, com a coluna `whatsapp` e sem `supporters`; a tabela `donations` (removida na `008`) não volta, e `/api/donations` continua respondendo 404.

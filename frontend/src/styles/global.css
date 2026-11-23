@@ -73,13 +73,20 @@ img { max-width: 100%; }
 @media (min-width: 768px) { .pet-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .pet-grid { grid-template-columns: repeat(3, 1fr); } }
 
+.donate-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-6); }
+@media (min-width: 768px) { .donate-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .donate-grid { grid-template-columns: repeat(3, 1fr); } }
+
 /* Home: a faixa de marca (componente Hero) e a busca logo abaixo */
 .home-hero { padding-top: var(--space-8); }
 .search-band { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-12); }
 /* Busca (home e Adotar): campo + botão na mesma linha */
 .search-form { display: flex; gap: var(--space-2); align-items: flex-end; }
 .search-form .ap-field { flex: 1; }
+/* Duas colunas: texto e card lado a lado (campanha na home) */
+.split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: var(--space-12); align-items: center; }
 @media (max-width: 860px) {
+  .split { grid-template-columns: 1fr; }
   .search-form { flex-direction: column; align-items: stretch; }
 }
 @media (max-width: 767px) {

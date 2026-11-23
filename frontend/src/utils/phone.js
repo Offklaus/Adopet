@@ -9,3 +9,10 @@ export function normalizePhone(value) {
   else if ((digits.length === 11 || digits.length === 12) && digits.startsWith('0')) digits = digits.slice(1)
   return digits.length === 10 || digits.length === 11 ? digits : null
 }
+
+/** "11912345678" → "(11) 91234-5678"; "1132345678" → "(11) 3234-5678". */
+export function formatPhone(digits) {
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return digits
+}
